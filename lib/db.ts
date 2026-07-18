@@ -1,4 +1,25 @@
-import { sql } from "@vercel/postgres";
+import postgres from "postgres";
+
+const dbUrl = process.env.POSTGRES_URL;
+if (!dbUrl) {
+  throw new Error("POSTGRES_URL environment variable is not set");
+}
+
+// Supabase (via Vercel integration) provides POSTGRES_URL as the
+// transaction-mode pooler URL. Prepared statements must be disabled
+// because PgBouncer transaction mode does not support them.
+//
+// max: 1 — each Vercel serverless function instance handles one request
+//   at a time, so a single connection per instance is optimal.
+// idle_timeout: 20 — short timeout is appropriate for short-lived
+//   serverless invocations to release connections promptly.
+export const sql = postgres(dbUrl, {
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 10,
+  ssl: "require",
+  prepare: false,
+});
 
 let schemaPromise: Promise<void> | null = null;
 
