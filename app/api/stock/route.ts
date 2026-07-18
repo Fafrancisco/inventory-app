@@ -1,11 +1,10 @@
-import { sql } from "@vercel/postgres";
 import { NextResponse } from "next/server";
-import { ensureSchema } from "@/lib/db";
+import { sql, ensureSchema } from "@/lib/db";
 
 export async function GET() {
   try {
     await ensureSchema();
-    const { rows } = await sql`
+    const rows = await sql`
       SELECT id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
       FROM stock_items
       ORDER BY nome ASC
@@ -30,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
     }
 
-    const { rows } = await sql`
+    const rows = await sql`
       INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
       VALUES (${nome.trim()}, ${Number(quantidade)}, ${Number(stock_minimo)}, ${localizacao}, ${unidade})
       RETURNING id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at

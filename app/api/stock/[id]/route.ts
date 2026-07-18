@@ -1,6 +1,5 @@
-import { sql } from "@vercel/postgres";
 import { NextResponse } from "next/server";
-import { ensureSchema } from "@/lib/db";
+import { sql, ensureSchema } from "@/lib/db";
 
 export async function PATCH(
   request: Request,
@@ -20,7 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: "delta deve ser um inteiro" }, { status: 400 });
     }
 
-    const { rows } = await sql`
+    const rows = await sql`
       UPDATE stock_items
       SET quantidade = GREATEST(0, quantidade + ${delta}),
           updated_at = NOW()
@@ -53,7 +52,7 @@ export async function DELETE(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    const { rows } = await sql`
+    const rows = await sql`
       DELETE FROM stock_items WHERE id = ${itemId} RETURNING id
     `;
 

@@ -1,4 +1,15 @@
-import { sql } from "@vercel/postgres";
+import postgres from "postgres";
+
+// Supabase (via Vercel integration) provides POSTGRES_URL as the
+// transaction-mode pooler URL. Prepared statements must be disabled
+// because PgBouncer transaction mode does not support them.
+export const sql = postgres(process.env.POSTGRES_URL!, {
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 10,
+  ssl: "require",
+  prepare: false,
+});
 
 let schemaPromise: Promise<void> | null = null;
 
