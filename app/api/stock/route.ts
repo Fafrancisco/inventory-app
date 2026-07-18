@@ -1,8 +1,10 @@
 import { sql } from "@vercel/postgres";
 import { NextResponse } from "next/server";
+import { ensureSchema } from "@/lib/db";
 
 export async function GET() {
   try {
+    await ensureSchema();
     const { rows } = await sql`
       SELECT id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
       FROM stock_items
@@ -20,6 +22,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await ensureSchema();
     const body = await request.json();
     const { nome, quantidade = 0, stock_minimo = 1, localizacao = "", unidade = "un" } = body;
 
