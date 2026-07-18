@@ -44,6 +44,23 @@ async function initSchema(): Promise<void> {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_stock_items_nome ON stock_items (nome)
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS products (
+      id         SERIAL PRIMARY KEY,
+      nome       VARCHAR(255) NOT NULL UNIQUE,
+      unidade    VARCHAR(20)  NOT NULL DEFAULT 'un',
+      created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS locations (
+      id         SERIAL PRIMARY KEY,
+      nome       VARCHAR(100) NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `;
 }
 
 export function ensureSchema(): Promise<void> {

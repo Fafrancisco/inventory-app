@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 
 interface StockItem {
   id: number;
@@ -10,6 +11,17 @@ interface StockItem {
   localizacao: string;
   unidade: string;
   updated_at: string;
+}
+
+interface ConfigProduct {
+  id: number;
+  nome: string;
+  unidade: string;
+}
+
+interface ConfigLocation {
+  id: number;
+  nome: string;
 }
 
 type ActiveTab = "inventario" | "compras";
@@ -28,6 +40,10 @@ export default function Home() {
     unidade: "un",
   });
   const [error, setError] = useState<string | null>(null);
+  const [configProducts, setConfigProducts] = useState<ConfigProduct[]>([]);
+  const [configLocations, setConfigLocations] = useState<ConfigLocation[]>([]);
+  const [customNome, setCustomNome] = useState(false);
+  const [customLocalizacao, setCustomLocalizacao] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -42,9 +58,19 @@ export default function Home() {
     }
   }, []);
 
+  const fetchConfig = useCallback(async () => {
+    const [pRes, lRes] = await Promise.all([
+      fetch("/api/config/products"),
+      fetch("/api/config/locations"),
+    ]);
+    if (pRes.ok) setConfigProducts(await pRes.json());
+    if (lRes.ok) setConfigLocations(await lRes.json());
+  }, []);
+
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+    fetchConfig();
+  }, [fetchItems, fetchConfig]);
 
   const handleQuantityChange = async (id: number, delta: number) => {
     try {
@@ -86,6 +112,8 @@ export default function Home() {
       const created: StockItem = await res.json();
       setItems((prev) => [created, ...prev]);
       setNewItem({ nome: "", quantidade: 0, stock_minimo: 1, localizacao: "", unidade: "un" });
+      setCustomNome(false);
+      setCustomLocalizacao(false);
       setShowAddForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
@@ -119,12 +147,21 @@ export default function Home() {
               {items.length} {items.length === 1 ? "item" : "itens"} · {lowStock.length} em falta
             </p>
           </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
-          >
-            + Novo
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/configuracoes"
+              className="text-blue-100 hover:text-white text-lg leading-none transition-colors"
+              aria-label="Configurações"
+            >
+              ⚙️
+            </Link>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="bg-white text-blue-600 text-sm font-semibold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-50 transition-colors"
+            >
+              + Novo
+            </button>
+          </div>
         </div>
       </header>
 
@@ -144,13 +181,64 @@ export default function Home() {
             className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm space-y-3"
           >
             <h2 className="text-sm font-semibold text-slate-700">Novo Item</h2>
-            <input
-              required
-              placeholder="Nome do produto"
-              value={newItem.nome}
-              onChange={(e) => setNewItem({ ...newItem, nome: e.target.value })}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+
+            {/* Product name: dropdown if products configured, else text input */}
+            {configProducts.length > 0 && !customNome ? (
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Produto</label>
+                <div className="flex gap-2">
+                  <select
+                    required
+                    value={newItem.nome}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const selected = configProducts.find((p) => p.nome === val);
+                      setNewItem({
+                        ...newItem,
+                        nome: val,
+                        unidade: selected ? selected.unidade : "un",
+                      });
+                    }}
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Selecionar produto --</option>
+                    {configProducts.map((p) => (
+                      <option key={p.id} value={p.nome}>{p.nome}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => { setCustomNome(true); setNewItem({ ...newItem, nome: "", unidade: "un" }); }}
+                    className="text-xs text-slate-500 hover:text-slate-700 border border-slate-300 rounded-lg px-2 py-1 whitespace-nowrap"
+                  >
+                    Outro
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Produto</label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    placeholder="Nome do produto"
+                    value={newItem.nome}
+                    onChange={(e) => setNewItem({ ...newItem, nome: e.target.value })}
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {configProducts.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setCustomNome(false); setNewItem({ ...newItem, nome: "" }); }}
+                      className="text-xs text-slate-500 hover:text-slate-700 border border-slate-300 rounded-lg px-2 py-1 whitespace-nowrap"
+                    >
+                      Lista
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Quantidade</label>
@@ -176,12 +264,47 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Localização</label>
-                <input
-                  placeholder="Ex: Cozinha"
-                  value={newItem.localizacao}
-                  onChange={(e) => setNewItem({ ...newItem, localizacao: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                {configLocations.length > 0 && !customLocalizacao ? (
+                  <div className="flex gap-1">
+                    <select
+                      value={newItem.localizacao}
+                      onChange={(e) => setNewItem({ ...newItem, localizacao: e.target.value })}
+                      className="flex-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Selecionar --</option>
+                      {configLocations.map((l) => (
+                        <option key={l.id} value={l.nome}>{l.nome}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => { setCustomLocalizacao(true); setNewItem({ ...newItem, localizacao: "" }); }}
+                      className="text-xs text-slate-500 hover:text-slate-700 border border-slate-300 rounded-lg px-2 py-1"
+                      title="Outra localização"
+                    >
+                      ✎
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <input
+                      placeholder="Ex: Cozinha"
+                      value={newItem.localizacao}
+                      onChange={(e) => setNewItem({ ...newItem, localizacao: e.target.value })}
+                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {configLocations.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomLocalizacao(false); setNewItem({ ...newItem, localizacao: "" }); }}
+                        className="text-xs text-slate-500 hover:text-slate-700 border border-slate-300 rounded-lg px-2 py-1"
+                        title="Usar lista"
+                      >
+                        ☰
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-slate-500 block mb-1">Unidade</label>
@@ -209,7 +332,7 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={() => { setShowAddForm(false); setCustomNome(false); setCustomLocalizacao(false); }}
                 className="flex-1 bg-slate-100 text-slate-700 text-sm font-semibold py-2 rounded-lg hover:bg-slate-200 transition-colors"
               >
                 Cancelar
