@@ -29,6 +29,21 @@ CREATE TRIGGER trg_stock_items_updated_at
     BEFORE UPDATE ON stock_items
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- Configurable products with default unit
+CREATE TABLE IF NOT EXISTS products (
+    id         SERIAL PRIMARY KEY,
+    nome       VARCHAR(255) NOT NULL UNIQUE,
+    unidade    VARCHAR(20)  NOT NULL DEFAULT 'un',
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Configurable locations
+CREATE TABLE IF NOT EXISTS locations (
+    id         SERIAL PRIMARY KEY,
+    nome       VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
 -- Sample data (optional)
 INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade) VALUES
     ('Arroz',        5,  2, 'Cozinha',   'kg'),
