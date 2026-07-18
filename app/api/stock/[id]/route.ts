@@ -30,7 +30,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
     }
     return NextResponse.json(rows[0]);
-  } catch {
+  } catch (error) {
+    console.error("PATCH /api/stock/[id] failed:", error);
     return NextResponse.json(
       { error: "Erro ao atualizar item" },
       { status: 500 }
@@ -57,7 +58,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
     }
     return NextResponse.json({ deleted: true, id: rows[0].id });
-  } catch {
+  } catch (error) {
+    console.error("DELETE /api/stock/[id] failed:", error);
     return NextResponse.json(
       { error: "Erro ao apagar item" },
       { status: 500 }
