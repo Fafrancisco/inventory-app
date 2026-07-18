@@ -1,11 +1,13 @@
 import { sql } from "@vercel/postgres";
 import { NextResponse } from "next/server";
+import { ensureSchema } from "@/lib/db";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {
@@ -44,6 +46,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {
