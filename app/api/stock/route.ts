@@ -9,7 +9,8 @@ export async function GET() {
       ORDER BY nome ASC
     `;
     return NextResponse.json(rows);
-  } catch {
+  } catch (error) {
+    console.error("GET /api/stock failed:", error);
     return NextResponse.json(
       { error: "Erro ao carregar itens" },
       { status: 500 }
@@ -32,7 +33,8 @@ export async function POST(request: Request) {
       RETURNING id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
     `;
     return NextResponse.json(rows[0], { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("POST /api/stock failed:", error);
     return NextResponse.json(
       { error: "Erro ao criar item" },
       { status: 500 }
