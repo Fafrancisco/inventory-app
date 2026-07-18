@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo ao Laboratório</title>
+    <!-- Tailwind CSS para um design rápido e limpo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ícones da biblioteca Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex items-center justify-center p-6 antialiased">
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        
+        <!-- Cabeçalho / Destaque -->
+        <div class="bg-blue-600 p-8 text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 text-white mb-4 shadow-sm">
+                <i class="ph ph-rocket-launch text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white mb-2">Deploy Concluído!</h1>
+            <p class="text-blue-100 text-sm font-medium">O teu ambiente Vercel está ativo.</p>
+        </div>
+
+        <!-- Conteúdo -->
+        <div class="p-8">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="ph ph-check-circle text-green-500"></i>
+                Próximos Passos
+            </h2>
+            
+            <ul class="space-y-4 mb-8">
+                <li class="flex items-start gap-3">
+                    <div class="bg-slate-100 p-2 rounded-lg text-slate-600 mt-0.5">
+                        <i class="ph ph-code"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-800">Adicionar uma framework</p>
+                        <p class="text-xs text-slate-500">Transforma este HTML estático numa app React, Vue ou Next.js.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <div class="bg-slate-100 p-2 rounded-lg text-slate-600 mt-0.5">
+                        <i class="ph ph-app-window"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-800">Configurar PWA</p>
+                        <p class="text-xs text-slate-500">Adiciona o `manifest.json` para instalação no telemóvel.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-3">
+                    <div class="bg-slate-100 p-2 rounded-lg text-slate-600 mt-0.5">
+                        <i class="ph ph-paw-print"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-800">Criar a primeira App</p>
+                        <p class="text-xs text-slate-500">Quem sabe, um gestor de vacinas e treinos para a Luna?</p>
+                    </div>
+                </li>
+            </ul>
+
+            <div class="text-center border-t border-slate-100 pt-6">
+                <p class="text-xs text-slate-400">
+                    A correr em infraestrutura Edge • <span id="time"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Apenas um pequeno script para mostrar a hora e dar alguma dinâmica à página
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('time').textContent = timeString;
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+
+</body>
+</html>
