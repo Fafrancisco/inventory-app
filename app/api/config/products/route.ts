@@ -27,9 +27,13 @@ export async function POST(request: Request) {
     const rows = await sql`
       INSERT INTO products (nome, unidade)
       VALUES (${nome.trim()}, ${unidade})
-      ON CONFLICT (nome) DO UPDATE SET unidade = EXCLUDED.unidade
+      ON CONFLICT (nome) DO NOTHING
       RETURNING id, nome, unidade
     `;
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Produto já existe" }, { status: 409 });
+    }
     return NextResponse.json(rows[0], { status: 201 });
   } catch (error) {
     console.error("POST /api/config/products failed:", error);

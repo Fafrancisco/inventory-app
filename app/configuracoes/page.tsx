@@ -69,9 +69,7 @@ export default function ConfiguracoesPage() {
       }
       const created: Product = await res.json();
       setProducts((prev) =>
-        [...prev.filter((p) => p.id !== created.id), created].sort((a, b) =>
-          a.nome.localeCompare(b.nome)
-        )
+        [...prev, created].sort((a, b) => a.nome.localeCompare(b.nome))
       );
       setNewProduct({ nome: "", unidade: "un" });
     } catch (err) {

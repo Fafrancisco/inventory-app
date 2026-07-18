@@ -191,11 +191,12 @@ export default function Home() {
                     required
                     value={newItem.nome}
                     onChange={(e) => {
-                      const selected = configProducts.find((p) => p.nome === e.target.value);
+                      const val = e.target.value;
+                      const selected = configProducts.find((p) => p.nome === val);
                       setNewItem({
                         ...newItem,
-                        nome: e.target.value,
-                        unidade: selected ? selected.unidade : newItem.unidade,
+                        nome: val,
+                        unidade: selected ? selected.unidade : "un",
                       });
                     }}
                     className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -207,7 +208,7 @@ export default function Home() {
                   </select>
                   <button
                     type="button"
-                    onClick={() => { setCustomNome(true); setNewItem({ ...newItem, nome: "" }); }}
+                    onClick={() => { setCustomNome(true); setNewItem({ ...newItem, nome: "", unidade: "un" }); }}
                     className="text-xs text-slate-500 hover:text-slate-700 border border-slate-300 rounded-lg px-2 py-1 whitespace-nowrap"
                   >
                     Outro
