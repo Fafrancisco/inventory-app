@@ -42,6 +42,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [configProducts, setConfigProducts] = useState<ConfigProduct[]>([]);
   const [configLocations, setConfigLocations] = useState<ConfigLocation[]>([]);
+  const [hasFetchedConfig, setHasFetchedConfig] = useState(false);
   const [customNome, setCustomNome] = useState(false);
   const [customLocalizacao, setCustomLocalizacao] = useState(false);
 
@@ -59,18 +60,29 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    const [pRes, lRes] = await Promise.all([
-      fetch("/api/config/products"),
-      fetch("/api/config/locations"),
-    ]);
-    if (pRes.ok) setConfigProducts(await pRes.json());
-    if (lRes.ok) setConfigLocations(await lRes.json());
-  }, []);
+    if (hasFetchedConfig) return;
+    try {
+      const [pRes, lRes] = await Promise.all([
+        fetch("/api/config/products"),
+        fetch("/api/config/locations"),
+      ]);
+      if (pRes.ok) setConfigProducts(await pRes.json());
+      if (lRes.ok) setConfigLocations(await lRes.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setHasFetchedConfig(true);
+    }
+  }, [hasFetchedConfig]);
 
   useEffect(() => {
     fetchItems();
-    fetchConfig();
-  }, [fetchItems, fetchConfig]);
+  }, [fetchItems]);
+
+  useEffect(() => {
+    if (!showAddForm) return;
+    void fetchConfig();
+  }, [showAddForm, fetchConfig]);
 
   const handleQuantityChange = async (id: number, delta: number) => {
     try {
