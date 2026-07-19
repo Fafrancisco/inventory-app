@@ -61,6 +61,61 @@ async function initSchema(): Promise<void> {
       created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `;
+
+  // Seed common household products (idempotent – skips duplicates)
+  await sql`
+    INSERT INTO products (nome, unidade) VALUES
+      ('Arroz',              'kg'),
+      ('Esparguete',         'kg'),
+      ('Massa',              'kg'),
+      ('Feijão',             'kg'),
+      ('Grão-de-bico',       'kg'),
+      ('Lentilhas',          'kg'),
+      ('Farinha',            'kg'),
+      ('Açúcar',             'kg'),
+      ('Sal',                'g'),
+      ('Azeite',             'L'),
+      ('Óleo',               'L'),
+      ('Vinagre',            'L'),
+      ('Molho de tomate',    'un'),
+      ('Polpa de tomate',    'un'),
+      ('Atum',               'un'),
+      ('Sardinha',           'un'),
+      ('Mel',                'un'),
+      ('Bolachas',           'pac'),
+      ('Cereais',            'pac'),
+      ('Leite',              'L'),
+      ('Manteiga',           'un'),
+      ('Ovos',               'un'),
+      ('Queijo',             'un'),
+      ('Iogurte',            'un'),
+      ('Café',               'kg'),
+      ('Chá',                'un'),
+      ('Água',               'L'),
+      ('Sumo',               'L'),
+      ('Pão',                'un'),
+      ('Tostas',             'pac'),
+      ('Legumes congelados', 'kg'),
+      ('Peixe congelado',    'kg'),
+      ('Detergente loiça',   'un'),
+      ('Detergente roupa',   'kg'),
+      ('Amaciador',          'L'),
+      ('Lixívia',            'L'),
+      ('Desinfetante',       'L'),
+      ('Limpa-vidros',       'un'),
+      ('Esponjas',           'un'),
+      ('Sacos de lixo',      'pac'),
+      ('Papel higiénico',    'un'),
+      ('Champô',             'un'),
+      ('Gel de banho',       'un'),
+      ('Pasta de dentes',    'un'),
+      ('Desodorizante',      'un'),
+      ('Sabão',              'un'),
+      ('Fraldas',            'pac'),
+      ('Pilhas',             'un'),
+      ('Papel de cozinha',   'un')
+    ON CONFLICT (nome) DO NOTHING
+  `;
 }
 
 export function ensureSchema(): Promise<void> {
