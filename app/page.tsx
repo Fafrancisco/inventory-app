@@ -120,11 +120,20 @@ export default function Home() {
     }
   };
 
+  const WARNING_MULTIPLIER = 2;
+  const MAX_QTY_MULTIPLIER = 3;
+
   const locations = [...new Set(items.map((i) => i.localizacao).filter(Boolean))];
   const filtered = items.filter(
     (i) => !locationFilter || i.localizacao === locationFilter
   );
   const lowStock = items.filter((i) => i.quantidade <= i.stock_minimo);
+
+  const resetAddForm = () => {
+    setShowAddForm(false);
+    setCustomNome(false);
+    setCustomLocalizacao(false);
+  };
 
   const displayItems = activeTab === "inventario" ? filtered : lowStock;
 
@@ -215,7 +224,7 @@ export default function Home() {
               <h2 className="font-semibold text-slate-800">Novo Item</h2>
               <button
                 type="button"
-                onClick={() => { setShowAddForm(false); setCustomNome(false); setCustomLocalizacao(false); }}
+                onClick={() => resetAddForm()}
                 className="text-slate-400 hover:text-slate-600 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"
               >
                 ✕
@@ -448,8 +457,8 @@ export default function Home() {
           <ul className="space-y-2.5">
             {displayItems.map((item) => {
               const isLow = item.quantidade <= item.stock_minimo;
-              const isWarning = !isLow && item.quantidade <= item.stock_minimo * 2;
-              const maxQty = Math.max(item.stock_minimo * 3, item.quantidade, 3);
+              const isWarning = !isLow && item.quantidade <= item.stock_minimo * WARNING_MULTIPLIER;
+              const maxQty = Math.max(item.stock_minimo * MAX_QTY_MULTIPLIER, item.quantidade, 3);
               const pct = Math.min(100, Math.round((item.quantidade / maxQty) * 100));
               const barColor = isLow
                 ? "bg-red-400"
@@ -458,7 +467,7 @@ export default function Home() {
                 : "bg-emerald-400";
               return (
                 <li key={item.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex">
-                  <div className={`w-1 shrink-0 ${isLow ? "bg-red-400" : "bg-blue-400"}`} />
+                  <div className={`w-1 shrink-0 ${isLow ? "bg-red-400" : isWarning ? "bg-amber-400" : "bg-blue-400"}`} />
                   <div className="flex-1 px-4 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
