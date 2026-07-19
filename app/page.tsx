@@ -42,10 +42,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [configProducts, setConfigProducts] = useState<ConfigProduct[]>([]);
   const [configLocations, setConfigLocations] = useState<ConfigLocation[]>([]);
-  const [hasFetchedConfig, setHasFetchedConfig] = useState(false);
   const [customNome, setCustomNome] = useState(false);
   const [customLocalizacao, setCustomLocalizacao] = useState(false);
-  const isFetchingConfigRef = useRef(false);
+  const configFetchStateRef = useRef<"idle" | "loading" | "loaded">("idle");
 
   const fetchItems = useCallback(async () => {
     try {
@@ -61,8 +60,8 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    if (hasFetchedConfig || isFetchingConfigRef.current) return;
-    isFetchingConfigRef.current = true;
+    if (configFetchStateRef.current !== "idle") return;
+    configFetchStateRef.current = "loading";
     try {
       const [pRes, lRes] = await Promise.all([
         fetch("/api/config/products"),
@@ -70,13 +69,12 @@ export default function Home() {
       ]);
       if (pRes.ok) setConfigProducts(await pRes.json());
       if (lRes.ok) setConfigLocations(await lRes.json());
-      setHasFetchedConfig(true);
+      configFetchStateRef.current = "loaded";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
-    } finally {
-      isFetchingConfigRef.current = false;
+      configFetchStateRef.current = "idle";
+      setError(err instanceof Error ? err.message : "Erro ao carregar configurações");
     }
-  }, [hasFetchedConfig]);
+  }, []);
 
   useEffect(() => {
     fetchItems();
