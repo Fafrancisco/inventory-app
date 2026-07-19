@@ -72,7 +72,7 @@ export default function Home() {
       configFetchStateRef.current = "loaded";
     } catch (err) {
       configFetchStateRef.current = "idle";
-      setError(err instanceof Error ? err.message : "Erro ao carregar configurações");
+      setError(err instanceof Error ? err.message : "Erro ao carregar produtos e localizações");
     }
   }, []);
 
