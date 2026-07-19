@@ -60,8 +60,7 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    if (configFetchStateRef.current === "loading") return;
-    if (configFetchStateRef.current === "loaded") return;
+    if (configFetchStateRef.current !== "idle") return;
     configFetchStateRef.current = "loading";
     try {
       const [pRes, lRes] = await Promise.all([
@@ -91,7 +90,8 @@ export default function Home() {
       configFetchStateRef.current = "loaded";
     } catch (err) {
       configFetchStateRef.current = "idle";
-      setError(err instanceof Error ? err.message : "Erro ao carregar produtos e localizações");
+      const failedResources = ["produtos", "localizações"];
+      setError(err instanceof Error ? err.message : `Erro ao carregar ${failedResources.join(" e ")}`);
     }
   }, []);
 
