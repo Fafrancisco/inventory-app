@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 
 interface StockItem {
@@ -45,6 +45,7 @@ export default function Home() {
   const [hasFetchedConfig, setHasFetchedConfig] = useState(false);
   const [customNome, setCustomNome] = useState(false);
   const [customLocalizacao, setCustomLocalizacao] = useState(false);
+  const isFetchingConfigRef = useRef(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -60,7 +61,8 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    if (hasFetchedConfig) return;
+    if (hasFetchedConfig || isFetchingConfigRef.current) return;
+    isFetchingConfigRef.current = true;
     try {
       const [pRes, lRes] = await Promise.all([
         fetch("/api/config/products"),
@@ -68,10 +70,11 @@ export default function Home() {
       ]);
       if (pRes.ok) setConfigProducts(await pRes.json());
       if (lRes.ok) setConfigLocations(await lRes.json());
+      setHasFetchedConfig(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
-      setHasFetchedConfig(true);
+      isFetchingConfigRef.current = false;
     }
   }, [hasFetchedConfig]);
 
