@@ -60,15 +60,34 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    if (configFetchStateRef.current !== "idle") return;
+    if (configFetchStateRef.current === "loading") return;
+    if (configFetchStateRef.current === "loaded") return;
     configFetchStateRef.current = "loading";
     try {
       const [pRes, lRes] = await Promise.all([
         fetch("/api/config/products"),
         fetch("/api/config/locations"),
       ]);
-      if (pRes.ok) setConfigProducts(await pRes.json());
-      if (lRes.ok) setConfigLocations(await lRes.json());
+      const failedResources: string[] = [];
+
+      if (pRes.ok) {
+        setConfigProducts(await pRes.json());
+      } else {
+        failedResources.push("produtos");
+      }
+
+      if (lRes.ok) {
+        setConfigLocations(await lRes.json());
+      } else {
+        failedResources.push("localizações");
+      }
+
+      if (failedResources.length > 0) {
+        configFetchStateRef.current = "idle";
+        setError(`Erro ao carregar ${failedResources.join(" e ")}`);
+        return;
+      }
+
       configFetchStateRef.current = "loaded";
     } catch (err) {
       configFetchStateRef.current = "idle";
