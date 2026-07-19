@@ -8,6 +8,10 @@ const ITEMS = [
 ];
 
 async function mockApi(page: Page, items = ITEMS) {
+  // Config routes (return empty lists so the form shows plain text inputs)
+  await page.route("**/api/config/products", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/config/locations", (route) => route.fulfill({ json: [] }));
+
   // Intercept the initial list fetch
   await page.route("**/api/stock", async (route) => {
     if (route.request().method() === "GET") {
@@ -71,10 +75,11 @@ test.describe("Inventory page", () => {
     await page.goto("/");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
-    await expect(arrozItem.getByText("5 kg")).toBeVisible();
+    // quantity and unit are in separate spans
+    await expect(arrozItem.getByText("5")).toBeVisible();
 
     await arrozItem.getByRole("button", { name: "+" }).click();
-    await expect(arrozItem.getByText("6 kg")).toBeVisible();
+    await expect(arrozItem.getByText("6")).toBeVisible();
   });
 
   test("decrements item quantity when − is clicked", async ({ page }) => {
@@ -83,7 +88,7 @@ test.describe("Inventory page", () => {
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     await arrozItem.getByRole("button", { name: "−" }).click();
-    await expect(arrozItem.getByText("4 kg")).toBeVisible();
+    await expect(arrozItem.getByText("4")).toBeVisible();
   });
 
   test("− button is disabled when quantity is 0", async ({ page }) => {
@@ -101,19 +106,20 @@ test.describe("Inventory page", () => {
 
     await page.getByRole("button", { name: "+ Novo" }).click();
     await page.getByPlaceholder("Nome do produto").fill("Leite");
-    await page.getByRole("button", { name: "Adicionar" }).click();
+    await page.getByRole("button", { name: "Adicionar ao Inventário" }).click();
 
     await expect(page.getByText("Leite")).toBeVisible();
   });
 
-  test("cancelling the add form hides it without adding an item", async ({ page }) => {
+  test("closing the add form hides it without adding an item", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
 
     await page.getByRole("button", { name: "+ Novo" }).click();
     await expect(page.getByPlaceholder("Nome do produto")).toBeVisible();
 
-    await page.getByRole("button", { name: "Cancelar" }).click();
+    // Close via the ✕ button in the form header
+    await page.getByRole("button", { name: "✕" }).click();
     await expect(page.getByPlaceholder("Nome do produto")).not.toBeVisible();
   });
 
@@ -131,7 +137,7 @@ test.describe("Inventory page", () => {
     await page.goto("/");
 
     // Click the "Cozinha" chip — only Cozinha items should remain visible
-    await page.getByRole("button", { name: "Cozinha" }).click();
+    await page.getByRole("button", { name: /📍 Cozinha/ }).click();
     await expect(page.getByText("Arroz")).toBeVisible();
     await expect(page.getByText("Café")).toBeVisible();
     await expect(page.getByText("Detergente")).not.toBeVisible();
@@ -141,23 +147,23 @@ test.describe("Inventory page", () => {
     await expect(page.getByText("Detergente")).toBeVisible();
   });
 
-  test("Lista de Compras tab shows only low-stock items", async ({ page }) => {
+  test("Compras tab shows only low-stock items", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
 
-    await page.getByRole("button", { name: /Lista de Compras/ }).click();
+    await page.getByRole("button", { name: /Compras/ }).click();
 
     // Only Detergente is below minimum
     await expect(page.getByText("Detergente")).toBeVisible();
     await expect(page.getByText("Arroz")).not.toBeVisible();
   });
 
-  test("Lista de Compras shows checkmark when all items are in stock", async ({ page }) => {
+  test("Compras shows checkmark when all items are in stock", async ({ page }) => {
     const fullStockItems = ITEMS.map((i) => ({ ...i, quantidade: i.stock_minimo + 5 }));
     await mockApi(page, fullStockItems);
     await page.goto("/");
 
-    await page.getByRole("button", { name: /Lista de Compras/ }).click();
-    await expect(page.getByText("Tudo bem em stock!")).toBeVisible();
+    await page.getByRole("button", { name: /Compras/ }).click();
+    await expect(page.getByText("Tudo em stock!")).toBeVisible();
   });
 });
