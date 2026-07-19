@@ -20,7 +20,7 @@ function createJsonResponse(data: unknown) {
   return {
     ok: true,
     json: vi.fn().mockResolvedValue(data),
-  } as Response;
+  } as unknown as Response;
 }
 
 describe("Home page loading", () => {
