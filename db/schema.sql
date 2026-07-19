@@ -52,3 +52,64 @@ INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade) V
     ('Papel higiénico', 4, 6, 'Casa de banho', 'un'),
     ('Café',         3,  2, 'Cozinha',   'un')
 ON CONFLICT DO NOTHING;
+
+-- Seed common household products
+INSERT INTO products (nome, unidade) VALUES
+  -- Mercearia / Despensa
+  ('Arroz',              'kg'),
+  ('Esparguete',         'kg'),
+  ('Massa',              'kg'),
+  ('Feijão',             'kg'),
+  ('Grão-de-bico',       'kg'),
+  ('Lentilhas',          'kg'),
+  ('Farinha',            'kg'),
+  ('Açúcar',             'kg'),
+  ('Sal',                'g'),
+  ('Azeite',             'L'),
+  ('Óleo',               'L'),
+  ('Vinagre',            'L'),
+  ('Molho de tomate',    'un'),
+  ('Polpa de tomate',    'un'),
+  ('Atum',               'un'),
+  ('Sardinha',           'un'),
+  ('Mel',                'un'),
+  ('Bolachas',           'pac'),
+  ('Cereais',            'pac'),
+  -- Frios / Laticínios
+  ('Leite',              'L'),
+  ('Manteiga',           'un'),
+  ('Ovos',               'un'),
+  ('Queijo',             'un'),
+  ('Iogurte',            'un'),
+  -- Bebidas
+  ('Café',               'kg'),
+  ('Chá',                'un'),
+  ('Água',               'L'),
+  ('Sumo',               'L'),
+  -- Pão / Padaria
+  ('Pão',                'un'),
+  ('Tostas',             'pac'),
+  -- Congelados
+  ('Legumes congelados', 'kg'),
+  ('Peixe congelado',    'kg'),
+  -- Limpeza
+  ('Detergente loiça',   'un'),
+  ('Detergente roupa',   'kg'),
+  ('Amaciador',          'L'),
+  ('Lixívia',            'L'),
+  ('Desinfetante',       'L'),
+  ('Limpa-vidros',       'un'),
+  ('Esponjas',           'un'),
+  ('Sacos de lixo',      'pac'),
+  -- Higiene pessoal
+  ('Papel higiénico',    'un'),
+  ('Champô',             'un'),
+  ('Gel de banho',       'un'),
+  ('Pasta de dentes',    'un'),
+  ('Desodorizante',      'un'),
+  ('Sabão',              'un'),
+  ('Fraldas',            'pac'),
+  -- Farmácia / Casa
+  ('Pilhas',             'un'),
+  ('Papel de cozinha',   'un')
+ON CONFLICT (nome) DO NOTHING;
