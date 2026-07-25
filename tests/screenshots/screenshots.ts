@@ -30,6 +30,35 @@ const LOCATIONS = [
 ];
 
 async function setupMocks(page: Page, items = ITEMS) {
+  await page.route("**/api/recipes", async (r) => {
+    const method = r.request().method();
+    if (method === "GET") {
+      await r.fulfill({
+        json: {
+          preferences: {
+            cuisine: "",
+            diet: "",
+            allergens: "",
+            max_time_minutes: null,
+            notes: "",
+            auto_suggest_enabled: true,
+            auto_suggest_cooldown_minutes: 180,
+          },
+          recipes: [],
+        },
+      });
+      return;
+    }
+
+    if (method === "PUT") {
+      const body = r.request().postDataJSON();
+      await r.fulfill({ status: 200, json: body });
+      return;
+    }
+
+    await r.fulfill({ status: 202, json: { generated: false, skipped: true, reason: "test-mocked" } });
+  });
+
   await page.route("**/api/config/products", (r) => r.fulfill({ json: PRODUCTS }));
   await page.route("**/api/config/locations", (r) => r.fulfill({ json: LOCATIONS }));
   await page.route("**/api/stock", async (r) => {

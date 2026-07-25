@@ -24,5 +24,10 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      ...process.env,
+      POSTGRES_URL: process.env.POSTGRES_URL ?? "postgres://test:test@127.0.0.1:5432/test",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "test-key",
+    },
   },
 });

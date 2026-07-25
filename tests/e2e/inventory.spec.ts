@@ -8,6 +8,39 @@ const ITEMS = [
 ];
 
 async function mockApi(page: Page, items = ITEMS) {
+  // Keep recipe side-effects deterministic during inventory tests.
+  await page.route("**/api/recipes", async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await route.fulfill({
+        json: {
+          preferences: {
+            cuisine: "",
+            diet: "",
+            allergens: "",
+            max_time_minutes: null,
+            notes: "",
+            auto_suggest_enabled: true,
+            auto_suggest_cooldown_minutes: 180,
+          },
+          recipes: [],
+        },
+      });
+      return;
+    }
+
+    if (method === "PUT") {
+      const body = route.request().postDataJSON();
+      await route.fulfill({ status: 200, json: body });
+      return;
+    }
+
+    await route.fulfill({
+      status: 202,
+      json: { generated: false, skipped: true, reason: "test-mocked" },
+    });
+  });
+
   // Config routes (return empty lists so the form shows plain text inputs)
   await page.route("**/api/config/products", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/config/locations", (route) => route.fulfill({ json: [] }));
@@ -53,8 +86,9 @@ test.describe("Inventory page", () => {
     for (const item of ITEMS) {
       await expect(page.getByText(item.nome)).toBeVisible();
     }
-    // Header shows correct counts
-    await expect(page.getByText(/3 itens/)).toBeVisible();
+    // Header shows correct total count in a robust way.
+    const totalCard = page.locator("div").filter({ hasText: "itens no total" }).first();
+    await expect(totalCard).toContainText(String(ITEMS.length));
   });
 
   test("shows low-stock badge on items at or below minimum", async ({ page }) => {

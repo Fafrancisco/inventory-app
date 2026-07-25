@@ -67,6 +67,18 @@ export default function Home() {
     if (lRes.ok) setConfigLocations(await lRes.json());
   }, []);
 
+  const triggerAutoRecipeSuggestion = useCallback(async () => {
+    try {
+      await fetch("/api/recipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "auto" }),
+      });
+    } catch {
+      // Silently ignore; recipe suggestions are best-effort only.
+    }
+  }, []);
+
   useEffect(() => {
     fetchItems();
     fetchConfig();
@@ -84,6 +96,7 @@ export default function Home() {
       setItems((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item))
       );
+      void triggerAutoRecipeSuggestion();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     }
@@ -95,6 +108,7 @@ export default function Home() {
       const res = await fetch(`/api/stock/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Erro ao apagar");
       setItems((prev) => prev.filter((item) => item.id !== id));
+      void triggerAutoRecipeSuggestion();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     }
@@ -115,6 +129,7 @@ export default function Home() {
       setCustomNome(false);
       setCustomLocalizacao(false);
       setShowAddForm(false);
+      void triggerAutoRecipeSuggestion();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     }
@@ -174,6 +189,13 @@ export default function Home() {
           <div className="flex items-start justify-between">
             <h1 className="text-2xl font-bold tracking-tight">📦 Inventário</h1>
             <div className="flex items-center gap-2 mt-0.5">
+              <Link
+                href="/receitas"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-lg"
+                aria-label="Receitas"
+              >
+                🍳
+              </Link>
               <Link
                 href="/configuracoes"
                 className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-lg"

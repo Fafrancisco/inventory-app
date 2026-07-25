@@ -52,6 +52,56 @@ CREATE TABLE IF NOT EXISTS locations (
     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- Preferences used to guide Gemini recipe generation
+CREATE TABLE IF NOT EXISTS recipe_preferences (
+    id                           INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    cuisine                      VARCHAR(100) NOT NULL DEFAULT '',
+    diet                         VARCHAR(100) NOT NULL DEFAULT '',
+    allergens                    TEXT NOT NULL DEFAULT '',
+    max_time_minutes             INTEGER CHECK (max_time_minutes >= 0),
+    notes                        TEXT NOT NULL DEFAULT '',
+    auto_suggest_enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    auto_suggest_cooldown_minutes INTEGER NOT NULL DEFAULT 180 CHECK (auto_suggest_cooldown_minutes >= 5),
+    updated_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO recipe_preferences (id)
+VALUES (1)
+ON CONFLICT (id) DO NOTHING;
+
+-- Stored recipes generated manually or automatically
+CREATE TABLE IF NOT EXISTS recipes (
+    id                    SERIAL PRIMARY KEY,
+    title                 VARCHAR(255) NOT NULL,
+    summary               TEXT NOT NULL DEFAULT '',
+    servings              INTEGER,
+    prep_minutes          INTEGER,
+    cook_minutes          INTEGER,
+    ingredients_json      JSONB NOT NULL DEFAULT '[]'::jsonb,
+    instructions_json     JSONB NOT NULL DEFAULT '[]'::jsonb,
+    source_inventory_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    context_recipe_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    generation_mode       VARCHAR(20) NOT NULL DEFAULT 'manual',
+    inventory_signature   TEXT NOT NULL DEFAULT '',
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recipes_generation_mode ON recipes (generation_mode);
+
+-- Ingredient rows normalized for filtering and future analytics
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+    id         SERIAL PRIMARY KEY,
+    recipe_id  INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    nome       VARCHAR(255) NOT NULL,
+    quantidade VARCHAR(50) NOT NULL DEFAULT '',
+    unidade    VARCHAR(20) NOT NULL DEFAULT 'un',
+    available  BOOLEAN NOT NULL DEFAULT TRUE,
+    notes      TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients (recipe_id);
+
 -- Sample data (optional)
 INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade) VALUES
     ('Arroz',        5,  2, 'Cozinha',   'kg'),

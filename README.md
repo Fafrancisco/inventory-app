@@ -12,6 +12,7 @@ A mobile-first PWA for household/lab stock management built with **Next.js 16.2.
 | 🛒 Shopping list | Auto-shows items where `quantidade ≤ stock_mínimo` |
 | ➕ Add item | Form with name, quantity, min stock, location, and unit |
 | 🗑️ Delete | Remove items with confirmation |
+| 🍳 Receitas com Gemini | Gera receitas com base no inventário, histórico e preferências |
 
 ## 🚀 Tech Stack
 
@@ -45,7 +46,11 @@ Set the environment variable:
 
 ```env
 POSTGRES_URL=******host/dbname
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
 ```
+
+`GEMINI_API_KEY` must only be configured server-side (local env + Vercel Environment Variables).
 
 ## 🛠️ Development
 
