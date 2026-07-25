@@ -62,6 +62,13 @@ async function initSchema(): Promise<void> {
     )
   `;
 
+  // Enable RLS on all public tables so PostgREST (anon/authenticated roles)
+  // cannot access them directly. The server uses the service-role pooler URL
+  // which bypasses RLS, so no permissive policies are needed.
+  await sql`ALTER TABLE stock_items ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE products    ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE locations   ENABLE ROW LEVEL SECURITY`;
+
   // Seed common household products (idempotent – skips duplicates)
   await sql`
     INSERT INTO products (nome, unidade) VALUES
