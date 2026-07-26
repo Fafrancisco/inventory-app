@@ -5,7 +5,7 @@ export async function GET() {
   try {
     await ensureSchema();
     const rows = await sql`
-      SELECT id, nome, unidade FROM products ORDER BY nome ASC
+      SELECT id, nome, unidade, localizacao_padrao, categoria FROM products ORDER BY nome ASC
     `;
     return NextResponse.json(rows);
   } catch (error) {
@@ -18,17 +18,20 @@ export async function POST(request: Request) {
   try {
     await ensureSchema();
     const body = await request.json();
-    const { nome, unidade = "un" } = body;
+    const { nome, unidade = "un", localizacao_padrao = "" } = body;
 
     if (!nome || typeof nome !== "string" || nome.trim() === "") {
       return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
     }
 
+    const defaultLocation =
+      typeof localizacao_padrao === "string" ? localizacao_padrao.trim() : "";
+
     const rows = await sql`
-      INSERT INTO products (nome, unidade)
-      VALUES (${nome.trim()}, ${unidade})
+      INSERT INTO products (nome, unidade, localizacao_padrao)
+      VALUES (${nome.trim()}, ${unidade}, ${defaultLocation || null})
       ON CONFLICT (nome) DO NOTHING
-      RETURNING id, nome, unidade
+      RETURNING id, nome, unidade, localizacao_padrao, categoria
     `;
 
     if (rows.length === 0) {

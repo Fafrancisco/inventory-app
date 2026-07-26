@@ -18,6 +18,7 @@ type StockRow = {
   quantidade: number;
   unidade: string;
   localizacao: string;
+  categoria?: string | null;
 };
 
 type ContextRecipeRow = {
@@ -45,6 +46,13 @@ type GeneratedRecipe = {
   ingredients: GeneratedIngredient[];
 };
 
+type MissingIngredient = {
+  nome: string;
+  quantidade: string;
+  unidade: string;
+  notes: string;
+};
+
 type RecipeRecord = {
   id: number;
   title: string;
@@ -55,10 +63,52 @@ type RecipeRecord = {
   ingredients_json: unknown;
   instructions_json: unknown;
   generation_mode: string;
+  is_favorite: boolean;
   created_at: string;
 };
 
+class GeminiApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-2.5-flash"];
+const CONTEXT_RECIPES_LIMIT = 5;
+const CONTEXT_RECIPE_SUMMARY_MAX_LEN = 220;
+const CONTEXT_RECIPE_INGREDIENTS_MAX = 10;
+
+const NON_EDIBLE_CATEGORY_KEYWORDS = [
+  "limpeza",
+  "higiene",
+  "casa",
+  "farmacia",
+  "farmácia",
+];
+
+const NON_EDIBLE_NAME_KEYWORDS = [
+  "detergente",
+  "lixivia",
+  "lixívia",
+  "desinfetante",
+  "limpa",
+  "champo",
+  "champô",
+  "gel de banho",
+  "pasta de dentes",
+  "desodorizante",
+  "sabon",
+  "fralda",
+  "pilha",
+  "papel higienico",
+  "papel higiénico",
+  "esponja",
+  "sacos de lixo",
+];
 
 function parseJsonArray(value: unknown): unknown[] {
   if (Array.isArray(value)) {
@@ -95,6 +145,34 @@ function normalizeText(value: unknown, fallback = ""): string {
     return fallback;
   }
   return value.trim();
+}
+
+function truncateText(value: string, maxLen: number): string {
+  if (value.length <= maxLen) return value;
+  return `${value.slice(0, Math.max(0, maxLen - 1)).trim()}...`;
+}
+
+function normalizeComparable(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}+/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isEdibleStockItem(item: StockRow): boolean {
+  const categoria = normalizeComparable(item.categoria ?? "");
+  const nome = normalizeComparable(item.nome);
+
+  if (NON_EDIBLE_CATEGORY_KEYWORDS.some((keyword) => categoria.includes(keyword))) {
+    return false;
+  }
+
+  if (NON_EDIBLE_NAME_KEYWORDS.some((keyword) => nome.includes(keyword))) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeInt(value: unknown): number | null {
@@ -155,6 +233,21 @@ function normalizeGeneratedRecipe(raw: unknown): GeneratedRecipe {
   };
 }
 
+function parseModelJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Some model responses may include extra text around the JSON object.
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const candidate = text.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(candidate);
+    }
+    throw new Error("Gemini devolveu JSON inválido");
+  }
+}
+
 function buildGeminiPrompt(
   inventory: StockRow[],
   preferences: RecipePreferenceRow,
@@ -167,6 +260,7 @@ function buildGeminiPrompt(
   const previousRecipes = contextRecipes
     .map((recipe) => {
       const ingredientList = parseJsonArray(recipe.ingredients_json)
+        .slice(0, CONTEXT_RECIPE_INGREDIENTS_MAX)
         .map((ing) => {
           const entry = parseJsonObject<Record<string, unknown>>(ing, {});
           const nome = normalizeText(entry.nome, "");
@@ -177,11 +271,25 @@ function buildGeminiPrompt(
         .filter(Boolean)
         .join(", ");
 
-      return `- ${recipe.title}: ${recipe.summary}${ingredientList ? ` | ingredientes: ${ingredientList}` : ""}`;
+      const compactSummary = truncateText(normalizeText(recipe.summary, ""), CONTEXT_RECIPE_SUMMARY_MAX_LEN);
+      return `- ${truncateText(recipe.title, 70)}: ${compactSummary}${ingredientList ? ` | ingredientes: ${ingredientList}` : ""}`;
     })
     .join("\n");
 
   return [
+    "Atua como um chef experiente de cozinha caseira.",
+    "Objetivo: criar receitas com sabor e praticidade, mantendo boa aceitacao por criancas.",
+    "Privilegia receitas diretas para o dia a dia, sem tecnicas desnecessariamente complexas.",
+    "Prioriza receitas existentes e reconhecidas (tradicionais ou amplamente conhecidas) em vez de inventar receitas novas.",
+    "Usa nomes canonicos e reais de pratos (ex.: arroz de frango, massa com atum, sopa de legumes) e evita titulos criativos inventados.",
+    "Se o inventario nao permitir a receita tradicional completa, adapta uma receita conhecida com substituicoes simples.",
+    "So propoe uma combinacao menos comum quando nao houver opcao razoavel de receita conhecida com os ingredientes disponiveis.",
+    "Admite leve picante ocasional, mas evita receitas demasiado picantes por defeito.",
+    "Usa preferencialmente ingredientes existentes no inventario; aceita algumas faltas quando melhorarem claramente o resultado.",
+    "Quando houver faltas, diferencia ingredientes essenciais de opcionais no campo notes de cada ingrediente (prefixa com 'ESSENCIAL:' ou 'OPCIONAL:').",
+    "Sempre que possivel, sugere substituicoes simples no campo notes para ingredientes em falta.",
+    "As preferências do utilizador abaixo têm prioridade máxima.",
+    "Se existir qualquer conflito entre estas regras base e as preferências do utilizador, segue sempre as preferências do utilizador.",
     "Gera uma receita em portugues europeu com base no inventario atual.",
     "Responde apenas em JSON valido, sem markdown.",
     "",
@@ -194,13 +302,92 @@ function buildGeminiPrompt(
     `- alergias/intolerancias: ${preferences.allergens || "nenhuma indicada"}`,
     `- tempo maximo: ${preferences.max_time_minutes ?? "sem limite"} minutos`,
     `- notas livres: ${preferences.notes || "nenhuma"}`,
+    "Trata esta secção de preferências como instruções de maior prioridade.",
     "",
     "Receitas anteriores para evitar repeticoes:",
     previousRecipes || "(sem historico)",
     "",
+    "Marca available=true apenas quando o ingrediente existe claramente no inventario acima; caso contrario available=false.",
+    "Se faltar ingrediente, usa notes para indicar uma alternativa opcional quando fizer sentido.",
     "Formato JSON esperado:",
     '{"title":"string","summary":"string","servings":number|null,"prepMinutes":number|null,"cookMinutes":number|null,"instructions":["passo 1"],"ingredients":[{"nome":"string","quantidade":"string","unidade":"string","available":true,"notes":"string"}]}'
   ].join("\n");
+}
+
+function isIngredientAvailable(nome: string, inventoryNormalized: Set<string>): boolean {
+  const target = normalizeComparable(nome);
+  if (!target) {
+    return true;
+  }
+
+  if (inventoryNormalized.has(target)) {
+    return true;
+  }
+
+  for (const candidate of inventoryNormalized) {
+    if (!candidate) continue;
+    if (candidate.includes(target) || target.includes(candidate)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function enrichWithAvailability(
+  recipe: GeneratedRecipe,
+  inventory: StockRow[]
+): { ingredients: GeneratedIngredient[]; missingIngredients: MissingIngredient[] } {
+  const inventoryNormalized = new Set(
+    inventory
+      .map((item) => normalizeComparable(item.nome))
+      .filter(Boolean)
+  );
+
+  const ingredients = recipe.ingredients.map((ingredient) => {
+    const available = isIngredientAvailable(ingredient.nome, inventoryNormalized);
+    return {
+      ...ingredient,
+      available,
+    };
+  });
+
+  const missingMap = new Map<string, MissingIngredient>();
+  for (const ingredient of ingredients) {
+    if (ingredient.available) continue;
+    const key = normalizeComparable(ingredient.nome);
+    if (!key || missingMap.has(key)) continue;
+    missingMap.set(key, {
+      nome: ingredient.nome,
+      quantidade: ingredient.quantidade,
+      unidade: ingredient.unidade,
+      notes: ingredient.notes,
+    });
+  }
+
+  return {
+    ingredients,
+    missingIngredients: Array.from(missingMap.values()),
+  };
+}
+
+function buildModelCandidates(): string[] {
+  const candidates = [DEFAULT_MODEL, ...GEMINI_FALLBACK_MODELS]
+    .map((model) => model.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(candidates));
+}
+
+function normalizeModelNameForApi(model: string): string {
+  return model.startsWith("models/") ? model : `models/${model}`;
+}
+
+function extractQuotaMessage(payload: unknown): string | null {
+  const parsed = parseJsonObject<Record<string, unknown>>(payload, {});
+  const error = parseJsonObject<Record<string, unknown>>(parsed.error, {});
+  const message = normalizeText(error.message, "");
+  return message || null;
 }
 
 async function callGemini(prompt: string): Promise<GeneratedRecipe> {
@@ -209,46 +396,84 @@ async function callGemini(prompt: string): Promise<GeneratedRecipe> {
     throw new Error("GEMINI_API_KEY não configurada");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(DEFAULT_MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.4,
+  const models = buildModelCandidates();
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    const modelPath = normalizeModelNameForApi(model);
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.4,
+            maxOutputTokens: 1600,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorPayload: unknown = { raw: errorText };
+      try {
+        errorPayload = JSON.parse(errorText);
+      } catch {
+        // Keep raw text when provider does not return JSON.
+      }
+      const quotaMessage = extractQuotaMessage(errorPayload);
+
+      if (response.status === 429) {
+        // If one model is quota-limited, try the next fallback model.
+        lastError = new GeminiApiError(
+          quotaMessage
+            ? `Quota do Gemini excedida no modelo ${model}: ${quotaMessage}`
+            : `Quota do Gemini excedida no modelo ${model}.`,
+          429
+        );
+        continue;
+      }
+
+      throw new GeminiApiError(
+        `Gemini API respondeu ${response.status}: ${JSON.stringify(errorPayload)}`,
+        response.status
+      );
     }
-  );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API respondeu ${response.status}: ${errorText}`);
+    const payload = await response.json();
+    const text = payload?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? "")
+      .join("\n")
+      .trim();
+
+    if (!text) {
+      lastError = new Error(`Gemini não devolveu conteúdo de texto (${model})`);
+      continue;
+    }
+
+    let raw: unknown;
+    try {
+      raw = parseModelJson(text);
+    } catch {
+      lastError = new Error(`Gemini devolveu JSON inválido (${model})`);
+      continue;
+    }
+
+    return normalizeGeneratedRecipe(raw);
   }
 
-  const payload = await response.json();
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part: { text?: string }) => part.text ?? "")
-    .join("\n")
-    .trim();
-
-  if (!text) {
-    throw new Error("Gemini não devolveu conteúdo de texto");
+  if (lastError) {
+    throw lastError;
   }
 
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    throw new Error("Gemini devolveu JSON inválido");
-  }
-
-  return normalizeGeneratedRecipe(raw);
+  throw new Error("Falha desconhecida ao chamar Gemini");
 }
 
 async function getPreferences(): Promise<RecipePreferenceRow> {
@@ -277,7 +502,7 @@ async function getPreferences(): Promise<RecipePreferenceRow> {
 
 async function getRecipes(limit = 20): Promise<RecipeRecord[]> {
   return sql<RecipeRecord[]>`
-    SELECT id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, created_at
+    SELECT id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, created_at
     FROM recipes
     ORDER BY created_at DESC
     LIMIT ${Math.min(Math.max(limit, 1), 50)}
@@ -296,18 +521,33 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       preferences,
-      recipes: recipes.map((recipe) => ({
-        id: recipe.id,
-        title: recipe.title,
-        summary: recipe.summary,
-        servings: recipe.servings,
-        prepMinutes: recipe.prep_minutes,
-        cookMinutes: recipe.cook_minutes,
-        ingredients: parseJsonArray(recipe.ingredients_json),
-        instructions: parseJsonArray(recipe.instructions_json),
-        generationMode: recipe.generation_mode,
-        createdAt: recipe.created_at,
-      })),
+      recipes: recipes.map((recipe) => {
+        const ingredients = parseJsonArray(recipe.ingredients_json);
+        const missingIngredients = ingredients
+          .map((ing) => parseJsonObject<Record<string, unknown>>(ing, {}))
+          .filter((ing) => ing.available === false)
+          .map((ing) => ({
+            nome: normalizeText(ing.nome, "Ingrediente"),
+            quantidade: normalizeText(ing.quantidade, ""),
+            unidade: normalizeText(ing.unidade, "un"),
+            notes: normalizeText(ing.notes, ""),
+          }));
+
+        return {
+          id: recipe.id,
+          title: recipe.title,
+          summary: recipe.summary,
+          servings: recipe.servings,
+          prepMinutes: recipe.prep_minutes,
+          cookMinutes: recipe.cook_minutes,
+          ingredients,
+          missingIngredients,
+          instructions: parseJsonArray(recipe.instructions_json),
+          generationMode: recipe.generation_mode,
+          isFavorite: recipe.is_favorite,
+          createdAt: recipe.created_at,
+        };
+      }),
     });
   } catch (error) {
     console.error("GET /api/recipes failed:", error);
@@ -375,28 +615,31 @@ export async function POST(request: Request) {
 
     const [inventory, preferences, contextRecipes] = await Promise.all([
       sql<StockRow[]>`
-        SELECT id, nome, quantidade, unidade, localizacao
-        FROM stock_items
-        WHERE quantidade > 0
-        ORDER BY nome ASC
+        SELECT s.id, s.nome, s.quantidade, s.unidade, s.localizacao, p.categoria
+        FROM stock_items s
+        LEFT JOIN products p ON p.nome = s.nome
+        WHERE s.quantidade > 0
+        ORDER BY s.nome ASC
       `,
       getPreferences(),
       sql<ContextRecipeRow[]>`
         SELECT id, title, summary, ingredients_json
         FROM recipes
         ORDER BY created_at DESC
-        LIMIT 5
+        LIMIT ${CONTEXT_RECIPES_LIMIT}
       `,
     ]);
 
-    if (inventory.length === 0) {
+    const edibleInventory = inventory.filter(isEdibleStockItem);
+
+    if (edibleInventory.length === 0) {
       return NextResponse.json(
-        { error: "Não há ingredientes no inventário para gerar receita" },
+        { error: "Não há ingredientes comestíveis no inventário para gerar receita" },
         { status: 400 }
       );
     }
 
-    const inventorySignature = buildInventorySignature(inventory);
+    const inventorySignature = buildInventorySignature(edibleInventory);
 
     if (mode === "auto") {
       if (!preferences.auto_suggest_enabled) {
@@ -425,12 +668,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const prompt = buildGeminiPrompt(inventory, preferences, contextRecipes);
+    const prompt = buildGeminiPrompt(edibleInventory, preferences, contextRecipes);
     const generated = await callGemini(prompt);
+    const enriched = enrichWithAvailability(generated, edibleInventory);
     const contextIds = contextRecipes.map((recipe: ContextRecipeRow) => recipe.id);
 
     const inserted = await sql<
-      { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; created_at: string }[]
+      { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; is_favorite: boolean; created_at: string }[]
     >`
       INSERT INTO recipes (
         title,
@@ -451,19 +695,19 @@ export async function POST(request: Request) {
         ${generated.servings},
         ${generated.prepMinutes},
         ${generated.cookMinutes},
-        ${JSON.stringify(generated.ingredients)}::jsonb,
+        ${JSON.stringify(enriched.ingredients)}::jsonb,
         ${JSON.stringify(generated.instructions)}::jsonb,
-        ${JSON.stringify(inventory)}::jsonb,
+        ${JSON.stringify(edibleInventory)}::jsonb,
         ${JSON.stringify(contextIds)}::jsonb,
         ${mode},
         ${inventorySignature}
       )
-      RETURNING id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, created_at
+      RETURNING id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, created_at
     `;
 
     const recipe = inserted[0];
 
-    for (const ingredient of generated.ingredients) {
+    for (const ingredient of enriched.ingredients) {
       await sql`
         INSERT INTO recipe_ingredients (recipe_id, nome, quantidade, unidade, available, notes)
         VALUES (${recipe.id}, ${ingredient.nome}, ${ingredient.quantidade}, ${ingredient.unidade}, ${ingredient.available}, ${ingredient.notes})
@@ -481,8 +725,10 @@ export async function POST(request: Request) {
           prepMinutes: recipe.prep_minutes,
           cookMinutes: recipe.cook_minutes,
           ingredients: parseJsonArray(recipe.ingredients_json),
+          missingIngredients: enriched.missingIngredients,
           instructions: parseJsonArray(recipe.instructions_json),
           generationMode: recipe.generation_mode,
+          isFavorite: recipe.is_favorite,
           createdAt: recipe.created_at,
         },
       },
@@ -490,8 +736,18 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("POST /api/recipes failed:", error);
+    const message = error instanceof Error ? error.message : "Erro ao gerar receita";
+
+    if (error instanceof GeminiApiError) {
+      return NextResponse.json({ error: message }, { status: error.status });
+    }
+
+    if (message.toLowerCase().includes("quota") || message.toLowerCase().includes("429")) {
+      return NextResponse.json({ error: message }, { status: 429 });
+    }
+
     return NextResponse.json(
-      { error: "Erro ao gerar receita" },
+      { error: message },
       { status: 500 }
     );
   }

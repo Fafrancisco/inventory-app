@@ -7,6 +7,7 @@ interface Product {
   id: number;
   nome: string;
   unidade: string;
+  localizacao_padrao: string | null;
 }
 
 interface Location {
@@ -14,17 +15,43 @@ interface Location {
   nome: string;
 }
 
+type ConfigSection = "products" | "locations";
+
 const UNIDADES = ["un", "kg", "g", "L", "ml", "cx", "pac"];
 
 export default function ConfiguracoesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [activeSection, setActiveSection] = useState<ConfigSection>("products");
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [newProduct, setNewProduct] = useState({ nome: "", unidade: "un" });
+  const [newProduct, setNewProduct] = useState({ nome: "", unidade: "un", localizacao_padrao: "" });
   const [newLocation, setNewLocation] = useState("");
+  const [editProduct, setEditProduct] = useState({ nome: "", unidade: "un", localizacao_padrao: "" });
+  const [editLocation, setEditLocation] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+
+  const normalizedProductQuery = productQuery.trim().toLowerCase();
+  const normalizedLocationQuery = locationQuery.trim().toLowerCase();
+
+  const filteredProducts = products.filter((p) => {
+    if (!normalizedProductQuery) return true;
+    return (
+      p.nome.toLowerCase().includes(normalizedProductQuery) ||
+      p.unidade.toLowerCase().includes(normalizedProductQuery) ||
+      (p.localizacao_padrao ?? "").toLowerCase().includes(normalizedProductQuery)
+    );
+  });
+
+  const filteredLocations = locations.filter((l) => {
+    if (!normalizedLocationQuery) return true;
+    return l.nome.toLowerCase().includes(normalizedLocationQuery);
+  });
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -71,7 +98,7 @@ export default function ConfiguracoesPage() {
       setProducts((prev) =>
         [...prev, created].sort((a, b) => a.nome.localeCompare(b.nome))
       );
-      setNewProduct({ nome: "", unidade: "un" });
+      setNewProduct({ nome: "", unidade: "un", localizacao_padrao: "" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     }
@@ -83,6 +110,45 @@ export default function ConfiguracoesPage() {
       const res = await fetch(`/api/config/products/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Erro ao apagar produto");
       setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    }
+  };
+
+  const startEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setEditProduct({
+      nome: product.nome,
+      unidade: product.unidade,
+      localizacao_padrao: product.localizacao_padrao ?? "",
+    });
+  };
+
+  const cancelEditProduct = () => {
+    setEditingProductId(null);
+    setEditProduct({ nome: "", unidade: "un", localizacao_padrao: "" });
+  };
+
+  const handleSaveProduct = async (id: number) => {
+    try {
+      const res = await fetch(`/api/config/products/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editProduct),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Erro ao atualizar produto");
+      }
+
+      const updated: Product = await res.json();
+      setProducts((prev) =>
+        prev
+          .map((p) => (p.id === id ? updated : p))
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+      );
+      cancelEditProduct();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     }
@@ -121,6 +187,41 @@ export default function ConfiguracoesPage() {
     }
   };
 
+  const startEditLocation = (location: Location) => {
+    setEditingLocationId(location.id);
+    setEditLocation(location.nome);
+  };
+
+  const cancelEditLocation = () => {
+    setEditingLocationId(null);
+    setEditLocation("");
+  };
+
+  const handleSaveLocation = async (id: number) => {
+    try {
+      const res = await fetch(`/api/config/locations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: editLocation }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Erro ao atualizar localização");
+      }
+
+      const updated: Location = await res.json();
+      setLocations((prev) =>
+        prev
+          .map((l) => (l.id === id ? updated : l))
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+      );
+      cancelEditLocation();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/40">
       {/* Header */}
@@ -140,7 +241,7 @@ export default function ConfiguracoesPage() {
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 pt-4 pb-24 space-y-5">
+      <div className="max-w-5xl mx-auto px-4 pt-4 pb-24">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2 shadow-sm">
             <span>{error}</span>
@@ -148,36 +249,89 @@ export default function ConfiguracoesPage() {
           </div>
         )}
 
+        <div className="md:hidden bg-white border border-slate-100 rounded-2xl p-1 mb-5 shadow-sm flex gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveSection("products")}
+            className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
+              activeSection === "products"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Produtos
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("locations")}
+            className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
+              activeSection === "locations"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Localizações
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+
         {/* Products section */}
-        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-800">Produtos</h2>
+        <section
+          className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden ${
+            activeSection === "products" ? "" : "hidden"
+          } md:block md:col-span-7`}
+        >
+          <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-slate-800">Produtos</h2>
+              <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                {products.length}
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Cada produto tem uma unidade padrão usada ao adicionar ao inventário.
             </p>
+            <input
+              placeholder="Pesquisar produto"
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+            />
           </div>
 
           {/* Add product form */}
-          <form onSubmit={handleAddProduct} className="px-4 py-3 border-b border-slate-100 flex gap-2">
+          <form onSubmit={handleAddProduct} className="px-4 py-3 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-12 gap-2">
             <input
               required
               placeholder="Nome do produto"
               value={newProduct.nome}
               onChange={(e) => setNewProduct({ ...newProduct, nome: e.target.value })}
-              className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+              className="sm:col-span-5 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
             />
             <select
               value={newProduct.unidade}
               onChange={(e) => setNewProduct({ ...newProduct, unidade: e.target.value })}
-              className="border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+              className="sm:col-span-2 border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
             >
               {UNIDADES.map((u) => (
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>
+            <select
+              value={newProduct.localizacao_padrao}
+              onChange={(e) => setNewProduct({ ...newProduct, localizacao_padrao: e.target.value })}
+              className="sm:col-span-4 border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+            >
+              <option value="">Sem localização padrão</option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.nome}>{l.nome}</option>
+              ))}
+            </select>
             <button
               type="submit"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+              className="sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center"
+              aria-label="Adicionar produto"
             >
               +
             </button>
@@ -190,24 +344,89 @@ export default function ConfiguracoesPage() {
                 <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
               ))}
             </div>
-          ) : products.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-8">Nenhum produto configurado.</p>
           ) : (
             <ul className="divide-y divide-slate-50">
-              {products.map((p) => (
+              {filteredProducts.map((p) => (
                 <li key={p.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-800 font-medium">{p.nome}</span>
-                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                      {p.unidade}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteProduct(p.id)}
-                    className="text-xs text-slate-300 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
-                  >
-                    Apagar
-                  </button>
+                  {editingProductId === p.id ? (
+                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <input
+                        value={editProduct.nome}
+                        onChange={(e) => setEditProduct({ ...editProduct, nome: e.target.value })}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <select
+                          value={editProduct.unidade}
+                          onChange={(e) => setEditProduct({ ...editProduct, unidade: e.target.value })}
+                          className="border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                          {UNIDADES.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={editProduct.localizacao_padrao}
+                          onChange={(e) => setEditProduct({ ...editProduct, localizacao_padrao: e.target.value })}
+                          className="border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="">Sem padrão</option>
+                          {locations.map((l) => (
+                            <option key={l.id} value={l.nome}>{l.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveProduct(p.id)}
+                          className="min-w-[92px] text-xs text-white bg-emerald-500 hover:bg-emerald-600 px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditProduct}
+                          className="min-w-[92px] text-xs text-slate-500 hover:text-slate-700 border border-slate-200 bg-white px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-slate-800 font-medium truncate">{p.nome}</span>
+                          <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                            {p.unidade}
+                          </span>
+                        </div>
+                        {p.localizacao_padrao && (
+                          <p className="text-xs text-slate-500 mt-1 truncate" title={p.localizacao_padrao}>
+                            📍 {p.localizacao_padrao}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEditProduct(p)}
+                          className="text-xs text-slate-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p.id)}
+                          className="text-xs text-slate-300 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+                        >
+                          Apagar
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -215,26 +434,42 @@ export default function ConfiguracoesPage() {
         </section>
 
         {/* Locations section */}
-        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-800">Localizações</h2>
+        <section
+          className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden ${
+            activeSection === "locations" ? "" : "hidden"
+          } md:block md:col-span-4 md:col-start-9`}
+        >
+          <div className="px-4 py-3 border-b border-slate-100 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-slate-800">Localizações</h2>
+              <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                {locations.length}
+              </span>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Locais onde os itens são armazenados (ex: Cozinha, Casa de banho).
             </p>
+            <input
+              placeholder="Pesquisar localização"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+            />
           </div>
 
           {/* Add location form */}
-          <form onSubmit={handleAddLocation} className="px-4 py-3 border-b border-slate-100 flex gap-2">
+          <form onSubmit={handleAddLocation} className="px-4 py-3 border-b border-slate-100 grid grid-cols-1 sm:grid-cols-12 gap-2">
             <input
               required
               placeholder="Nome da localização"
               value={newLocation}
               onChange={(e) => setNewLocation(e.target.value)}
-              className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+              className="sm:col-span-9 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
             />
             <button
               type="submit"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+              className="sm:col-span-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center"
+              aria-label="Adicionar localização"
             >
               +
             </button>
@@ -247,26 +482,64 @@ export default function ConfiguracoesPage() {
                 <div key={i} className="h-10 bg-slate-100 rounded-xl animate-pulse" />
               ))}
             </div>
-          ) : locations.length === 0 ? (
+          ) : filteredLocations.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-8">Nenhuma localização configurada.</p>
           ) : (
             <ul className="divide-y divide-slate-50">
-              {locations.map((l) => (
+              {filteredLocations.map((l) => (
                 <li key={l.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/50 transition-colors">
-                  <span className="text-sm text-slate-800 font-medium flex items-center gap-1.5">
-                    <span className="text-slate-400">📍</span> {l.nome}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteLocation(l.id)}
-                    className="text-xs text-slate-300 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
-                  >
-                    Apagar
-                  </button>
+                  {editingLocationId === l.id ? (
+                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <input
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLocation(l.id)}
+                          className="min-w-[92px] text-xs text-white bg-emerald-500 hover:bg-emerald-600 px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditLocation}
+                          className="min-w-[92px] text-xs text-slate-500 hover:text-slate-700 border border-slate-200 bg-white px-2.5 py-2 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-sm text-slate-800 font-medium flex items-center gap-1.5">
+                        <span className="text-slate-400">📍</span> {l.nome}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEditLocation(l)}
+                          className="text-xs text-slate-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLocation(l.id)}
+                          className="text-xs text-slate-300 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
+                        >
+                          Apagar
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </section>
+        </div>
       </div>
     </div>
   );

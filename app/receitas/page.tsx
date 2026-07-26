@@ -18,7 +18,14 @@ type Recipe = {
     notes: string;
   }>;
   instructions: string[];
+  missingIngredients: Array<{
+    nome: string;
+    quantidade: string;
+    unidade: string;
+    notes: string;
+  }>;
   generationMode: string;
+  isFavorite?: boolean;
   createdAt: string;
 };
 
@@ -48,8 +55,24 @@ export default function ReceitasPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addingMissingForRecipeId, setAddingMissingForRecipeId] = useState<number | null>(null);
+  const [updatingRecipeId, setUpdatingRecipeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  const normalizeComparable = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/\p{Diacritic}+/gu, "")
+      .toLowerCase()
+      .trim();
+
+  const normalizeUnit = (unit: string) => {
+    const normalized = unit.trim();
+    if (!normalized) return "un";
+    const allowed = new Set(["un", "kg", "L", "g", "ml", "cx", "pac"]);
+    return allowed.has(normalized) ? normalized : "un";
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -120,11 +143,174 @@ export default function ReceitasPage() {
       }
 
       setRecipes((prev) => [data.recipe, ...prev]);
-      setInfo("Nova receita gerada com sucesso.");
+      const missingCount = Array.isArray(data?.recipe?.missingIngredients)
+        ? data.recipe.missingIngredients.length
+        : 0;
+      setInfo(
+        missingCount > 0
+          ? `Nova receita gerada. Faltam ${missingCount} ingrediente(s); podes adicioná-los à lista de compras.`
+          : "Nova receita gerada com sucesso."
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const addMissingToShopping = async (recipe: Recipe) => {
+    const missing = Array.isArray(recipe.missingIngredients)
+      ? recipe.missingIngredients
+      : [];
+    if (missing.length === 0) {
+      setInfo("Esta receita não tem ingredientes em falta.");
+      return;
+    }
+
+    setAddingMissingForRecipeId(recipe.id);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const [stockRes, productsRes] = await Promise.all([
+        fetch("/api/stock"),
+        fetch("/api/config/products"),
+      ]);
+
+      if (!stockRes.ok) {
+        throw new Error("Não foi possível ler o inventário atual");
+      }
+
+      const stockItems = (await stockRes.json()) as Array<{ nome: string }>;
+      const existingStockNames = new Set(
+        stockItems.map((item) => normalizeComparable(item.nome)).filter(Boolean)
+      );
+
+      const existingProductNames = new Set<string>();
+      if (productsRes.ok) {
+        const products = (await productsRes.json()) as Array<{ nome: string }>;
+        for (const product of products) {
+          const key = normalizeComparable(product.nome);
+          if (key) existingProductNames.add(key);
+        }
+      }
+
+      const uniqueMissing = new Map<string, { nome: string; unidade: string }>();
+      for (const ingredient of missing) {
+        const key = normalizeComparable(ingredient.nome);
+        if (!key || uniqueMissing.has(key)) continue;
+        uniqueMissing.set(key, {
+          nome: ingredient.nome.trim(),
+          unidade: normalizeUnit(ingredient.unidade),
+        });
+      }
+
+      let created = 0;
+      let alreadyPresent = 0;
+
+      for (const [key, ingredient] of uniqueMissing.entries()) {
+        if (existingStockNames.has(key)) {
+          alreadyPresent += 1;
+          continue;
+        }
+
+        const createRes = await fetch("/api/stock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: ingredient.nome,
+            quantidade: 0,
+            stock_minimo: 1,
+            unidade: ingredient.unidade,
+            localizacao: "",
+          }),
+        });
+
+        if (!createRes.ok) {
+          continue;
+        }
+
+        created += 1;
+        existingStockNames.add(key);
+
+        if (!existingProductNames.has(key)) {
+          await fetch("/api/config/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: ingredient.nome,
+              unidade: ingredient.unidade,
+            }),
+          }).catch(() => {
+            // Best effort only.
+          });
+        }
+      }
+
+      if (created > 0) {
+        setInfo(`Adicionados ${created} ingrediente(s) em falta à lista de compras.`);
+      } else if (alreadyPresent > 0) {
+        setInfo("Os ingredientes em falta já estavam no inventário/lista de compras.");
+      } else {
+        setInfo("Não foi possível adicionar ingredientes em falta automaticamente.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setAddingMissingForRecipeId(null);
+    }
+  };
+
+  const toggleFavoriteRecipe = async (recipe: Recipe) => {
+    setUpdatingRecipeId(recipe.id);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const res = await fetch(`/api/recipes/${recipe.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: !recipe.isFavorite }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Erro ao atualizar favorito");
+      }
+
+      setRecipes((prev) =>
+        prev.map((r) => (r.id === recipe.id ? { ...r, isFavorite: Boolean(data.isFavorite) } : r))
+      );
+      setInfo(data.isFavorite ? "Receita guardada como favorita." : "Receita removida dos favoritos.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setUpdatingRecipeId(null);
+    }
+  };
+
+  const deleteRecipe = async (recipe: Recipe) => {
+    if (!confirm(`Apagar a receita \"${recipe.title}\"?`)) {
+      return;
+    }
+
+    setUpdatingRecipeId(recipe.id);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const res = await fetch(`/api/recipes/${recipe.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Erro ao apagar receita");
+      }
+
+      setRecipes((prev) => prev.filter((r) => r.id !== recipe.id));
+      setInfo("Receita apagada.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setUpdatingRecipeId(null);
     }
   };
 
@@ -140,7 +326,7 @@ export default function ReceitasPage() {
             ←
           </Link>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold">🍳 Receitas com Gemini</h1>
+            <h1 className="text-xl font-bold">🍳 Chef AI</h1>
             <p className="text-amber-100 text-xs mt-0.5">
               Sugestões com base no inventário e no teu histórico.
             </p>
@@ -247,21 +433,6 @@ export default function ReceitasPage() {
               Ativar sugestões automáticas quando o inventário muda
             </label>
 
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Cooldown automático (min)</label>
-              <input
-                type="number"
-                min="5"
-                value={preferences.auto_suggest_cooldown_minutes}
-                onChange={(e) =>
-                  setPreferences((prev) => ({
-                    ...prev,
-                    auto_suggest_cooldown_minutes: Math.max(5, Number(e.target.value || 5)),
-                  }))
-                }
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50"
-              />
-            </div>
           </div>
 
           <div className="px-4 pb-4">
@@ -306,15 +477,37 @@ export default function ReceitasPage() {
                       <h3 className="text-sm font-semibold text-slate-800">{recipe.title}</h3>
                       {recipe.summary && <p className="text-xs text-slate-500 mt-0.5">{recipe.summary}</p>}
                     </div>
-                    <span
-                      className={`text-[11px] px-2 py-0.5 rounded-full border ${
-                        recipe.generationMode === "auto"
-                          ? "bg-blue-50 text-blue-600 border-blue-100"
-                          : "bg-amber-50 text-amber-700 border-amber-100"
-                      }`}
-                    >
-                      {recipe.generationMode === "auto" ? "auto" : "manual"}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                          recipe.generationMode === "auto"
+                            ? "bg-blue-50 text-blue-600 border-blue-100"
+                            : "bg-amber-50 text-amber-700 border-amber-100"
+                        }`}
+                      >
+                        {recipe.generationMode === "auto" ? "auto" : "manual"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void toggleFavoriteRecipe(recipe)}
+                        disabled={updatingRecipeId === recipe.id}
+                        className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors disabled:opacity-50 ${
+                          recipe.isFavorite
+                            ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            : "bg-white text-slate-500 border-slate-200 hover:border-yellow-200 hover:text-yellow-700"
+                        }`}
+                      >
+                        {recipe.isFavorite ? "★ Favorita" : "☆ Favorita"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteRecipe(recipe)}
+                        disabled={updatingRecipeId === recipe.id}
+                        className="text-[11px] px-2 py-0.5 rounded-full border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        Apagar
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
@@ -337,6 +530,31 @@ export default function ReceitasPage() {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                  {recipe.missingIngredients.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-amber-800 mb-1">Faltam ingredientes</p>
+                      <ul className="text-xs text-amber-800 space-y-0.5 mb-2">
+                        {recipe.missingIngredients.map((ingredient, index) => (
+                          <li key={`${recipe.id}-missing-${index}`}>
+                            • {ingredient.nome}
+                            {ingredient.quantidade ? ` - ${ingredient.quantidade}` : ""}
+                            {ingredient.unidade ? ` ${ingredient.unidade}` : ""}
+                            {ingredient.notes ? ` (${ingredient.notes})` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={() => void addMissingToShopping(recipe)}
+                        disabled={addingMissingForRecipeId === recipe.id}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {addingMissingForRecipeId === recipe.id
+                          ? "A adicionar..."
+                          : "Adicionar faltas à lista de compras"}
+                      </button>
                     </div>
                   )}
 

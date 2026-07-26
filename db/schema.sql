@@ -4,8 +4,8 @@
 CREATE TABLE IF NOT EXISTS stock_items (
     id          SERIAL PRIMARY KEY,
     nome        VARCHAR(255) NOT NULL,
-    quantidade  INTEGER NOT NULL DEFAULT 0 CHECK (quantidade >= 0),
-    stock_minimo INTEGER NOT NULL DEFAULT 1 CHECK (stock_minimo >= 0),
+    quantidade  NUMERIC(12, 3) NOT NULL DEFAULT 0 CHECK (quantidade >= 0),
+    stock_minimo NUMERIC(12, 3) NOT NULL DEFAULT 1 CHECK (stock_minimo >= 0),
     localizacao VARCHAR(100) NOT NULL DEFAULT '',
     unidade     VARCHAR(20)  NOT NULL DEFAULT 'un',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS products (
     id         SERIAL PRIMARY KEY,
     nome       VARCHAR(255) NOT NULL UNIQUE,
     unidade    VARCHAR(20)  NOT NULL DEFAULT 'un',
+    localizacao_padrao VARCHAR(100),
+    categoria  VARCHAR(60),
     created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -82,6 +84,7 @@ CREATE TABLE IF NOT EXISTS recipes (
     source_inventory_json JSONB NOT NULL DEFAULT '[]'::jsonb,
     context_recipe_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb,
     generation_mode       VARCHAR(20) NOT NULL DEFAULT 'manual',
+    is_favorite          BOOLEAN NOT NULL DEFAULT FALSE,
     inventory_signature   TEXT NOT NULL DEFAULT '',
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -102,6 +105,13 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
 
 CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients (recipe_id);
 
+CREATE TABLE IF NOT EXISTS app_meta (
+    key        VARCHAR(120) PRIMARY KEY,
+    value      TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Sample data (optional)
 INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade) VALUES
     ('Arroz',        5,  2, 'Cozinha',   'kg'),
@@ -111,8 +121,17 @@ INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade) V
     ('Café',         3,  2, 'Cozinha',   'un')
 ON CONFLICT DO NOTHING;
 
--- Seed common household products
-INSERT INTO products (nome, unidade) VALUES
+-- Seed common household products once per database
+WITH seed_lock AS (
+    INSERT INTO app_meta (key, value)
+    VALUES ('products-default-seed-v1', 'done')
+    ON CONFLICT (key) DO NOTHING
+    RETURNING key
+)
+INSERT INTO products (nome, unidade)
+SELECT v.nome, v.unidade
+FROM (
+    VALUES
   -- Mercearia / Despensa
   ('Arroz',              'kg'),
   ('Esparguete',         'kg'),
@@ -147,6 +166,20 @@ INSERT INTO products (nome, unidade) VALUES
   -- Pão / Padaria
   ('Pão',                'un'),
   ('Tostas',             'pac'),
+    -- Frescos básicos
+    ('Alho',               'un'),
+    ('Cebola',             'kg'),
+    ('Batata',             'kg'),
+    ('Cenoura',            'kg'),
+    ('Tomate',             'kg'),
+    ('Alface',             'un'),
+    ('Pimento',            'un'),
+    ('Curgete',            'kg'),
+    ('Salsa',              'un'),
+    ('Coentros',           'un'),
+    ('Limão',              'un'),
+    ('Maçã',               'kg'),
+    ('Banana',             'kg'),
   -- Congelados
   ('Legumes congelados', 'kg'),
   ('Peixe congelado',    'kg'),
@@ -170,4 +203,6 @@ INSERT INTO products (nome, unidade) VALUES
   -- Farmácia / Casa
   ('Pilhas',             'un'),
   ('Papel de cozinha',   'un')
+) AS v(nome, unidade)
+WHERE EXISTS (SELECT 1 FROM seed_lock)
 ON CONFLICT (nome) DO NOTHING;

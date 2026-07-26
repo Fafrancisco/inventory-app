@@ -5,8 +5,17 @@ export async function GET() {
   try {
     await ensureSchema();
     const rows = await sql`
-      SELECT id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
-      FROM stock_items
+      SELECT
+        s.id,
+        s.nome,
+        s.quantidade,
+        s.stock_minimo,
+        s.localizacao,
+        s.unidade,
+        s.updated_at,
+        p.categoria
+      FROM stock_items s
+      LEFT JOIN products p ON p.nome = s.nome
       ORDER BY nome ASC
     `;
     return NextResponse.json(rows);
@@ -29,10 +38,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
     }
 
+    const parsedQuantidade = Number(quantidade);
+    const parsedStockMinimo = Number(stock_minimo);
+    if (!Number.isFinite(parsedQuantidade) || parsedQuantidade < 0) {
+      return NextResponse.json({ error: "quantidade inválida" }, { status: 400 });
+    }
+    if (!Number.isFinite(parsedStockMinimo) || parsedStockMinimo < 0) {
+      return NextResponse.json({ error: "stock_minimo inválido" }, { status: 400 });
+    }
+
     const rows = await sql`
-      INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
-      VALUES (${nome.trim()}, ${Number(quantidade)}, ${Number(stock_minimo)}, ${localizacao}, ${unidade})
-      RETURNING id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
+      WITH inserted AS (
+        INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
+        VALUES (${nome.trim()}, ${parsedQuantidade}, ${parsedStockMinimo}, ${localizacao}, ${unidade})
+        RETURNING id, nome, quantidade, stock_minimo, localizacao, unidade, updated_at
+      )
+      SELECT i.*, p.categoria
+      FROM inserted i
+      LEFT JOIN products p ON p.nome = i.nome
     `;
     return NextResponse.json(rows[0], { status: 201 });
   } catch (error) {
