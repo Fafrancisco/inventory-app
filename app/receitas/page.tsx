@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { ArrowLeft, ChefHat, RefreshCw, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Recipe = {
   id: number;
@@ -315,33 +317,34 @@ export default function ReceitasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-amber-50/40">
-      <header className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg">
-        <div className="max-w-2xl mx-auto px-4 pt-5 pb-4 flex items-center gap-3">
+    <div className="min-h-screen">
+      <header className="bg-[#12212b] text-white shadow-[0_12px_40px_rgb(18_33_43/0.18)]">
+        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 pb-5 pt-6 sm:px-6">
           <Link
             href="/"
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-lg"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7f36b]"
             aria-label="Voltar ao inventário"
           >
-            ←
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold">🍳 Chef AI</h1>
-            <p className="text-amber-100 text-xs mt-0.5">
+            <h1 className="flex items-center gap-2 text-xl font-black tracking-[-0.04em]"><ChefHat className="h-5 w-5 text-[#c7f36b]" aria-hidden="true" /> Chef AI</h1>
+            <p className="mt-0.5 text-xs text-slate-300">
               Sugestões com base no inventário e no teu histórico.
             </p>
           </div>
-          <button
+          <Button
             onClick={() => void generateRecipe()}
             disabled={generating || loading}
-            className="ml-auto bg-white text-orange-600 text-sm font-bold px-4 py-2 rounded-xl shadow-sm hover:bg-orange-50 disabled:opacity-50"
+            className="ml-auto bg-[#c7f36b] text-[#12212b] hover:bg-[#d8f992]"
           >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
             {generating ? "A gerar..." : "Gerar"}
-          </button>
+          </Button>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-24">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 pb-24 pt-5 sm:px-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2 shadow-sm">
             <span>{error}</span>
@@ -436,13 +439,13 @@ export default function ReceitasPage() {
           </div>
 
           <div className="px-4 pb-4">
-            <button
+            <Button
               onClick={() => void savePreferences()}
               disabled={saving || loading}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50"
+              className="bg-[#12212b] text-white hover:bg-[#1d3542]"
             >
               {saving ? "A guardar..." : "Guardar preferências"}
-            </button>
+            </Button>
           </div>
         </section>
 
@@ -452,12 +455,14 @@ export default function ReceitasPage() {
               <h2 className="font-semibold text-slate-800">Histórico de receitas</h2>
               <p className="text-xs text-slate-400 mt-0.5">As receitas guardadas também são usadas como contexto.</p>
             </div>
-            <button
+            <Button
               onClick={() => void fetchData()}
-              className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg px-2.5 py-1.5"
+              variant="secondary"
+              className="min-h-9 rounded-lg px-2.5 py-1.5 text-xs"
             >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               Atualizar
-            </button>
+            </Button>
           </div>
 
           {loading ? (

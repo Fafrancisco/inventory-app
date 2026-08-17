@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 // ── Shared mock data ────────────────────────────────────────────────────────
 const ITEMS = [
@@ -96,6 +97,14 @@ test.describe("Inventory page", () => {
     await expect(totalCard).toContainText(String(ITEMS.length));
   });
 
+  test("dashboard has no automated accessibility violations", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/");
+
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
   test("shows low-stock badge on items at or below minimum", async ({ page }) => {
     await mockApi(page);
     await page.goto("/");
@@ -117,7 +126,7 @@ test.describe("Inventory page", () => {
     // quantity and unit are in separate spans
     await expect(arrozItem.getByText("5")).toBeVisible();
 
-    await arrozItem.getByRole("button", { name: "+" }).click();
+    await arrozItem.getByRole("button", { name: "Aumentar quantidade de Arroz" }).click();
     await expect(arrozItem.getByText("6")).toBeVisible();
   });
 
@@ -128,7 +137,7 @@ test.describe("Inventory page", () => {
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     await arrozItem.getByRole("button", { name: "Editar quantidade de Arroz" }).click();
 
-    const input = arrozItem.getByRole("textbox", { name: "Quantidade de Arroz" });
+    const input = arrozItem.getByRole("spinbutton", { name: "Quantidade de Arroz" });
     await input.fill("9");
     await input.press("Enter");
 
@@ -140,7 +149,7 @@ test.describe("Inventory page", () => {
     await page.goto("/");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
-    await arrozItem.getByRole("button", { name: "−" }).click();
+    await arrozItem.getByRole("button", { name: "Diminuir quantidade de Arroz" }).click();
     await expect(arrozItem.getByText("4")).toBeVisible();
   });
 
@@ -150,7 +159,7 @@ test.describe("Inventory page", () => {
     await page.goto("/");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
-    await expect(arrozItem.getByRole("button", { name: "−" })).toBeDisabled();
+    await expect(arrozItem.getByRole("button", { name: "Diminuir quantidade de Arroz" })).toBeDisabled();
   });
 
   test("adds a new item via the form", async ({ page }) => {

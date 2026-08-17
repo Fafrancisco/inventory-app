@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { ArrowLeft, Plus, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Product {
   id: number;
@@ -223,25 +225,25 @@ export default function ConfiguracoesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/40">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-        <div className="max-w-lg mx-auto px-4 pt-5 pb-4 flex items-center gap-3">
+      <header className="bg-[#12212b] text-white shadow-[0_12px_40px_rgb(18_33_43/0.18)]">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 pb-5 pt-6 sm:px-6">
           <Link
             href="/"
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-lg"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7f36b]"
             aria-label="Voltar ao inventário"
           >
-            ←
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold">⚙️ Configurações</h1>
-            <p className="text-blue-100 text-xs mt-0.5">Produtos e localizações</p>
+            <h1 className="flex items-center gap-2 text-xl font-black tracking-[-0.04em]"><Settings className="h-5 w-5 text-[#c7f36b]" aria-hidden="true" /> Configurações</h1>
+            <p className="mt-0.5 text-xs text-slate-300">Produtos e localizações</p>
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 pt-4 pb-24">
+      <div className="mx-auto max-w-5xl px-4 pb-24 pt-5 sm:px-6">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2 shadow-sm">
             <span>{error}</span>
@@ -328,13 +330,13 @@ export default function ConfiguracoesPage() {
                 <option key={l.id} value={l.nome}>{l.nome}</option>
               ))}
             </select>
-            <button
+            <Button
               type="submit"
-              className="sm:col-span-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center"
+              className="sm:col-span-1 px-3 py-2.5"
               aria-label="Adicionar produto"
             >
-              +
-            </button>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </form>
 
           {/* Product list */}
@@ -466,13 +468,13 @@ export default function ConfiguracoesPage() {
               onChange={(e) => setNewLocation(e.target.value)}
               className="sm:col-span-9 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
             />
-            <button
+            <Button
               type="submit"
-              className="sm:col-span-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-3 py-2.5 rounded-xl hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center"
+              className="sm:col-span-3 px-3 py-2.5"
               aria-label="Adicionar localização"
             >
-              +
-            </button>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </form>
 
           {/* Location list */}

@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { ChefHat, Package, Settings, ShoppingCart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { InventoryCard } from "@/components/inventory/inventory-card";
 
 interface StockItem {
   id: number;
@@ -383,42 +386,48 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/40">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-        <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
+      <header className="overflow-hidden bg-[#12212b] text-white shadow-[0_12px_40px_rgb(18_33_43/0.18)]">
+        <div className="mx-auto max-w-2xl px-4 pb-5 pt-6 sm:px-6">
           <div className="flex items-start justify-between">
-            <h1 className="text-2xl font-bold tracking-tight">📦 Inventário</h1>
+            <div>
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[#c7f36b]">Casa em ordem</p>
+              <h1 className="flex items-center gap-2 text-2xl font-black tracking-[-0.04em]">
+                <Package className="h-6 w-6 text-[#c7f36b]" aria-hidden="true" />
+                Inventário
+              </h1>
+            </div>
             <div className="flex items-center gap-2 mt-0.5">
               <Link
                 href="/configuracoes"
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-lg"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7f36b]"
                 aria-label="Configurações"
               >
-                ⚙️
+                <Settings className="h-5 w-5" aria-hidden="true" />
               </Link>
             </div>
           </div>
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div className="bg-white/10 rounded-lg px-2.5 py-1.5 text-center border border-white/10">
-              <p className="text-base font-semibold">{items.length}</p>
-              <p className="text-[11px] text-blue-100/90">itens no total</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3">
+              <p className="text-2xl font-black tracking-[-0.04em]">{items.length}</p>
+              <p className="text-xs font-medium text-slate-300">itens no total</p>
             </div>
-            <div className={`rounded-lg px-2.5 py-1.5 text-center transition-colors border ${
-              lowStock.length > 0 ? "bg-red-400/20 border-red-200/40" : "bg-white/10 border-white/10"
+            <div className={`rounded-2xl border px-3 py-3 transition-colors ${
+              lowStock.length > 0 ? "border-[#f5b3a8]/50 bg-[#f5b3a8]/15" : "border-white/10 bg-white/[0.08]"
             }`}>
-              <p className="text-base font-semibold">{lowStock.length}</p>
-              <p className="text-[11px] text-blue-100/90">em falta</p>
+              <p className="text-2xl font-black tracking-[-0.04em]">{lowStock.length}</p>
+              <p className="text-xs font-medium text-slate-300">em falta</p>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto px-4 pt-2 pb-28">
+      <main className="mx-auto max-w-2xl px-4 pb-32 pt-5 sm:px-6">
         {/* Error banner */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-4 flex items-start justify-between gap-2 shadow-sm">
+          <div role="alert" className="mb-4 flex items-start justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm">
             <span>{error}</span>
             <button onClick={() => setError(null)} className="font-bold shrink-0 text-red-400 hover:text-red-600">✕</button>
           </div>
@@ -627,12 +636,12 @@ export default function Home() {
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+              className="w-full rounded-xl py-3"
             >
               Adicionar ao Inventário
-            </button>
+            </Button>
           </form>
         )}
 
@@ -645,22 +654,24 @@ export default function Home() {
           </div>
 
           <div className="flex gap-1">
-            <button
+            <Button
               onClick={() => setActiveTab("inventario")}
-              className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
+              variant={activeTab === "inventario" ? "primary" : "ghost"}
+              className={`flex-1 rounded-xl py-2.5 ${
                 activeTab === "inventario"
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  ? ""
+                  : "text-slate-500"
               }`}
             >
               Inventário
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setActiveTab("compras")}
-              className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
+              variant={activeTab === "compras" ? "danger" : "ghost"}
+              className={`flex-1 rounded-xl py-2.5 ${
                 activeTab === "compras"
-                  ? "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                  ? ""
+                  : "text-slate-500"
               }`}
             >
               Compras{lowStock.length > 0 && (
@@ -670,7 +681,7 @@ export default function Home() {
                   {lowStock.length}
                 </span>
               )}
-            </button>
+            </Button>
             <Link
               href="/receitas"
               className="flex-1 text-center text-sm font-semibold py-2.5 rounded-xl transition-all text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-100"
@@ -754,189 +765,39 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <ul className="space-y-2.5">
-            {displayItems.map((item) => {
-              const isLow = item.quantidade <= item.stock_minimo;
-              const isWarning = !isLow && item.quantidade <= item.stock_minimo * WARNING_MULTIPLIER;
-              const maxQty = Math.max(item.stock_minimo * MAX_QTY_MULTIPLIER, item.quantidade, 3);
-              const pct = Math.min(100, Math.round((item.quantidade / maxQty) * 100));
-              const barColor = isLow
-                ? "bg-red-400"
-                : isWarning
-                ? "bg-amber-400"
-                : "bg-emerald-400";
-              return (
-                <li key={item.id} className="bg-white rounded-2xl shadow-sm overflow-hidden flex">
-                  <div className={`w-1 shrink-0 ${isLow ? "bg-red-400" : isWarning ? "bg-amber-400" : "bg-blue-400"}`} />
-                  <div className="flex-1 px-4 py-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-slate-800 text-sm">{item.nome}</span>
-                          {isLow && (
-                            <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-full font-medium shrink-0">
-                              Baixo
-                            </span>
-                          )}
-                        </div>
-                        {item.localizacao && (
-                          <span className="inline-flex items-center gap-1 text-xs text-slate-400 mt-1 bg-slate-50 px-2 py-0.5 rounded-full">
-                            📍 {item.localizacao}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleQuantityChange(item.id, -1)}
-                          disabled={item.quantidade <= 0}
-                          className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-bold text-lg flex items-center justify-center hover:bg-slate-200 disabled:opacity-30 transition-colors"
-                        >
-                          −
-                        </button>
-                        <div className="flex flex-col items-center w-16">
-                          {editingQuantityId === item.id ? (
-                            <input
-                              type="number"
-                              inputMode={isDecimalUnit(item.unidade) ? "decimal" : "numeric"}
-                              step={getNumberStep(item.unidade)}
-                              min="0"
-                              autoFocus
-                              value={quantityDraft}
-                              onFocus={(e) => {
-                                if (quantityDraft === "0") {
-                                  setQuantityDraft("");
-                                }
-                                e.currentTarget.select();
-                              }}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val.includes(",")) {
-                                  return;
-                                }
-                                if (!isValidNumericInput(val, item.unidade)) {
-                                  return;
-                                }
-                                setQuantityDraft(val);
-                              }}
-                              onBlur={() => void saveQuantityEdit(item)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  void saveQuantityEdit(item);
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelQuantityEdit();
-                                }
-                              }}
-                              className="w-14 text-center border border-blue-200 rounded-lg px-1 py-0.5 text-base font-bold leading-tight text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              aria-label={`Quantidade de ${item.nome}`}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => startQuantityEdit(item)}
-                              className={`text-base font-bold leading-tight rounded-md px-1 hover:bg-slate-100 transition-colors ${isLow ? "text-red-500" : "text-slate-800"}`}
-                              title="Editar quantidade"
-                              aria-label={`Editar quantidade de ${item.nome}`}
-                            >
-                              {formatUnitAmount(item.quantidade, item.unidade)}
-                            </button>
-                          )}
-                          <span className="text-xs text-slate-400 leading-tight">{item.unidade}</span>
-                        </div>
-                        <button
-                          onClick={() => handleQuantityChange(item.id, 1)}
-                          className="w-9 h-9 rounded-full bg-blue-50 text-blue-600 font-bold text-lg flex items-center justify-center hover:bg-blue-100 transition-colors"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                    {/* Stock progress bar */}
-                    <div className="mt-2.5">
-                      <div className="flex justify-between items-center mb-1">
-                        {editingStockMinId === item.id ? (
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <span>mín:</span>
-                            <input
-                              type="number"
-                              inputMode={isDecimalUnit(item.unidade) ? "decimal" : "numeric"}
-                              step={getStockMinStep(item.unidade)}
-                              min="0"
-                              autoFocus
-                              value={stockMinDraft}
-                              onFocus={(e) => {
-                                if (stockMinDraft === "0") {
-                                  setStockMinDraft("");
-                                }
-                                e.currentTarget.select();
-                              }}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val.includes(",")) {
-                                  return;
-                                }
-                                if (!isValidNumericInput(val, item.unidade)) {
-                                  return;
-                                }
-                                setStockMinDraft(val);
-                              }}
-                              onBlur={() => void saveStockMinEdit(item)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  void saveStockMinEdit(item);
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelStockMinEdit();
-                                }
-                              }}
-                              className="w-16 text-center border border-blue-200 rounded-lg px-1 py-0.5 text-xs font-semibold leading-tight text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                              aria-label={`Stock mínimo de ${item.nome}`}
-                            />
-                            <span>{item.unidade}</span>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startStockMinEdit(item)}
-                            className="text-xs text-slate-400 hover:text-slate-600 rounded-md px-1 hover:bg-slate-100 transition-colors"
-                            title="Editar stock mínimo"
-                            aria-label={`Editar stock mínimo de ${item.nome}`}
-                          >
-                            mín: {formatUnitAmount(item.stock_minimo, item.unidade)} {item.unidade}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-xs text-slate-300 hover:text-red-400 transition-colors"
-                        >
-                          Apagar
-                        </button>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
+          <ul className="space-y-3">
+            {displayItems.map((item) => (
+              <InventoryCard
+                key={item.id}
+                item={item}
+                warningMultiplier={WARNING_MULTIPLIER}
+                maxQuantityMultiplier={MAX_QTY_MULTIPLIER}
+                editingQuantity={editingQuantityId === item.id}
+                quantityDraft={quantityDraft}
+                editingStockMinimum={editingStockMinId === item.id}
+                stockMinimumDraft={stockMinDraft}
+                onQuantityChange={handleQuantityChange}
+                onQuantityDraftChange={setQuantityDraft}
+                onStockMinimumDraftChange={setStockMinDraft}
+                onStartQuantityEdit={startQuantityEdit}
+                onSaveQuantityEdit={(selectedItem) => void saveQuantityEdit(selectedItem)}
+                onCancelQuantityEdit={cancelQuantityEdit}
+                onStartStockMinimumEdit={startStockMinEdit}
+                onSaveStockMinimumEdit={(selectedItem) => void saveStockMinEdit(selectedItem)}
+                onCancelStockMinimumEdit={cancelStockMinEdit}
+                onDelete={(id) => void handleDelete(id)}
+              />
+            ))}
           </ul>
         )}
 
-        <button
+        <Button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 bg-blue-600 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-lg hover:bg-blue-700 transition-colors"
+          className="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-2xl px-5 py-3 shadow-lg"
         >
           {showAddForm ? "Fechar" : "+ Novo"}
-        </button>
-      </div>
+        </Button>
+      </main>
     </div>
   );
 }

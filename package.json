@@ -15,12 +15,14 @@
     "products:reset:basics": "node scripts/reset-products-basics.mjs"
   },
   "dependencies": {
+    "lucide-react": "^1.31.0",
     "next": "16.2.10",
     "postgres": "^3.4.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
