@@ -769,7 +769,7 @@ export default function Home() {
           <Button
             variant={activeTab === "compras" ? "danger" : "ghost"}
             onClick={() => setActiveTab("compras")}
-            className={`min-h-12 flex-col gap-0.5 rounded-xl px-2 py-1.5 text-[11px] ${activeTab === "compras" ? "bg-rose-600 hover:bg-rose-700" : "text-slate-500"}`}
+            className={`min-h-12 flex-col gap-0.5 rounded-xl px-2 py-1.5 text-[11px] ${activeTab === "compras" ? "bg-rose-600 text-white hover:bg-rose-700" : "text-slate-500"}`}
           >
             <span className="relative">
               <ShoppingCart className="h-4 w-4" aria-hidden="true" />
