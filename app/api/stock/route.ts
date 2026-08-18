@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
-    await ensureSchema();
     const rows = await sql`
       SELECT
         s.id,
@@ -30,7 +29,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = await request.json();
     const { nome, quantidade = 0, stock_minimo = 1, localizacao = "", unidade = "un" } = body;
 

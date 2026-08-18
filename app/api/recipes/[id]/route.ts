@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureSchema, sql } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 type RecipeUpdateRow = {
   id: number;
@@ -11,7 +11,6 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const recipeId = Number(id);
 
@@ -48,7 +47,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const recipeId = Number(id);
 

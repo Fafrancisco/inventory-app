@@ -91,7 +91,7 @@ Run it only against a staging database or an isolated test account. The cleanup 
 
 ## 🚦 Production CI/CD Gate
 
-The `Production Gate` workflow runs the read-only Playwright suite after pushes to `main`. It polls Vercel until the exact GitHub commit has a ready production deployment, tests that immutable deployment URL, sends the Deployment Protection bypass header, and uploads Playwright evidence. If the gate fails, it promotes the previous ready production deployment.
+The `Production Gate` workflow runs the read-only Playwright suite after pushes to `main`. It first checks whether `db/**` or `scripts/migrate-db.mjs` changed. In the usual case, database migration is skipped. If database files changed, the protected `database-migration` environment runs `db:migrate` before the smoke gate continues. The workflow then polls Vercel until the exact GitHub commit has a ready production deployment, tests that immutable deployment URL, sends the Deployment Protection bypass header, and uploads Playwright evidence. If the gate fails, it promotes the previous ready production deployment.
 
 Configure these GitHub repository secrets:
 
@@ -101,6 +101,18 @@ VERCEL_TOKEN
 ```
 
 `VERCEL_TOKEN` is used to identify the exact deployment for the commit and by the failure rollback job. The workflow never runs the mutating production suite.
+
+## 🗃️ Database Migrations
+
+Database schema changes use the separate, manual `Database Migration` workflow. Normal application requests do not create tables, alter columns, seed products, or enable RLS.
+
+Run locally when intentionally applying the checked-in schema:
+
+```bash
+POSTGRES_URL=your-database-url npm run db:migrate
+```
+
+For GitHub Actions, configure a protected `database-migration` environment with a `POSTGRES_URL` secret. Start **Actions → Database Migration → Run workflow**, and type `APPLY` as confirmation. The production gate does not run database migrations.
 
 ## 📸 Playwright Evidence
 

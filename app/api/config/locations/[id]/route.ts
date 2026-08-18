@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {
@@ -43,7 +42,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {

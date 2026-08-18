@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export async function GET() {
   try {
-    await ensureSchema();
     const rows = await sql`
       SELECT id, nome, unidade, localizacao_padrao, categoria FROM products ORDER BY nome ASC
     `;
@@ -16,7 +15,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = await request.json();
     const { nome, unidade = "un", localizacao_padrao = "" } = body;
 

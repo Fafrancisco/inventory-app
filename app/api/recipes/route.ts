@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureSchema, sql } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 type RecipePreferenceRow = {
   cuisine: string;
@@ -511,7 +511,6 @@ async function getRecipes(limit = 20): Promise<RecipeRecord[]> {
 
 export async function GET(request: Request) {
   try {
-    await ensureSchema();
     const { searchParams } = new URL(request.url);
     const limitParam = Number(searchParams.get("limit") ?? "20");
     const [preferences, recipes] = await Promise.all([
@@ -560,7 +559,6 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    await ensureSchema();
     const body = await request.json();
 
     const cuisine = normalizeText(body.cuisine, "");
@@ -608,7 +606,6 @@ export async function PUT(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "auto" ? "auto" : "manual";
     const force = Boolean(body.force);

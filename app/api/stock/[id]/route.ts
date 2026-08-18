@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 export async function PATCH(
   request: Request,
@@ -22,8 +22,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-
-    await ensureSchema();
 
     let rows;
     if (hasStockMinimo) {
@@ -74,7 +72,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {
