@@ -15,14 +15,6 @@ CREATE TABLE IF NOT EXISTS stock_items (
 CREATE INDEX IF NOT EXISTS idx_stock_items_localizacao ON stock_items (localizacao);
 CREATE INDEX IF NOT EXISTS idx_stock_items_nome       ON stock_items (nome);
 
--- Enable Row Level Security on all public tables to block direct PostgREST
--- access via the anon/authenticated roles. The app connects server-side via
--- the service-role pooler URL and is unaffected; no permissive policies are
--- added, so PostgREST callers get no access at all.
-ALTER TABLE stock_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE locations   ENABLE ROW LEVEL SECURITY;
-
 -- Trigger to keep updated_at current
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
@@ -104,6 +96,14 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients (recipe_id);
+
+-- Enable RLS only after every application table exists.
+ALTER TABLE stock_items          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE locations            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recipe_preferences   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recipes              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recipe_ingredients   ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS app_meta (
     key        VARCHAR(120) PRIMARY KEY,
