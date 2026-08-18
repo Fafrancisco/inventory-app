@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChefHat, Package, Settings, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InventoryCard } from "@/components/inventory/inventory-card";
+import { readStockSnapshot, writeStockSnapshot } from "@/lib/inventory-cache";
 
 interface StockItem {
   id: number;
@@ -148,9 +149,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const snapshot = readStockSnapshot();
+    if (snapshot) {
+      setItems(snapshot);
+      setLoading(false);
+    }
+
     fetchItems();
     fetchConfig();
   }, [fetchItems, fetchConfig]);
+
+  useEffect(() => {
+    if (!loading) writeStockSnapshot(items);
+  }, [items, loading]);
 
   useEffect(() => {
     if (!showAddForm) return;

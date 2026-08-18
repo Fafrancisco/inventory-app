@@ -61,6 +61,24 @@ npm run build      # production build
 npx tsc --noEmit   # type-check
 ```
 
+## 🌐 Production Smoke Tests
+
+The production suite uses Playwright and is intentionally read-only. It checks the dashboard, Chef AI navigation, return-navigation latency, Settings, and browser console errors without creating or deleting data.
+
+```bash
+PROD_BASE_URL=https://your-deployment.example.com npm run test:e2e:prod
+```
+
+For a Vercel deployment protected by Deployment Protection, provide the bypass secret through the shell without committing it:
+
+```bash
+PROD_BASE_URL=https://your-deployment.example.com \
+VERCEL_PROTECTION_BYPASS=your-secret \
+npm run test:e2e:prod
+```
+
+Run this against a staging deployment first. Add authenticated or mutating scenarios only with a disposable test account and explicit test data cleanup.
+
 ## 📸 Playwright Evidence
 
 All screenshots were captured with Playwright on a simulated **iPhone 14 Pro** viewport (390×844 @2x):
