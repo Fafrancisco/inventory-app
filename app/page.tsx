@@ -435,7 +435,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 pb-32 pt-5 sm:px-6">
+      <main className="mx-auto max-w-2xl px-4 pb-36 pt-5 sm:px-6">
         {/* Error banner */}
         {error && (
           <div role="alert" className="mb-4 flex items-start justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-sm">
@@ -656,52 +656,6 @@ export default function Home() {
           </form>
         )}
 
-        {/* Tabs */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-3 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-xs font-medium text-slate-500">
-              {activeTab === "inventario" ? "Secção Inventário" : "Secção Compras"}
-            </p>
-          </div>
-
-          <div className="flex gap-1">
-            <Button
-              onClick={() => setActiveTab("inventario")}
-              variant={activeTab === "inventario" ? "primary" : "ghost"}
-              className={`flex-1 rounded-xl py-2.5 ${
-                activeTab === "inventario"
-                  ? ""
-                  : "text-slate-500"
-              }`}
-            >
-              Inventário
-            </Button>
-            <Button
-              onClick={() => setActiveTab("compras")}
-              variant={activeTab === "compras" ? "danger" : "ghost"}
-              className={`flex-1 rounded-xl py-2.5 ${
-                activeTab === "compras"
-                  ? ""
-                  : "text-slate-500"
-              }`}
-            >
-              Compras{lowStock.length > 0 && (
-                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-                  activeTab === "compras" ? "bg-white/25" : "bg-red-100 text-red-500"
-                }`}>
-                  {lowStock.length}
-                </span>
-              )}
-            </Button>
-            <Link
-              href="/receitas"
-              className="flex-1 text-center text-sm font-semibold py-2.5 rounded-xl transition-all text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-100"
-            >
-              Chef AI
-            </Link>
-          </div>
-        </div>
-
         {/* Location filter */}
         {activeTab === "inventario" && locations.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
@@ -804,11 +758,53 @@ export default function Home() {
 
         <Button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-2xl px-5 py-3 shadow-lg"
+          className="fixed bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-2xl px-5 py-3 shadow-lg"
         >
           {showAddForm ? "Fechar" : "+ Novo"}
         </Button>
       </main>
+
+      <nav
+        aria-label="Navegação principal"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(15_23_42/0.08)] backdrop-blur"
+      >
+        <div className="mx-auto grid max-w-2xl grid-cols-4 gap-1 px-3 py-2 sm:px-6">
+          <Button
+            variant={activeTab === "inventario" ? "primary" : "ghost"}
+            onClick={() => setActiveTab("inventario")}
+            className={`min-h-12 flex-col gap-0.5 rounded-xl px-2 py-1.5 text-[11px] ${activeTab === "inventario" ? "bg-[#12212b] hover:bg-[#1d3542]" : "text-slate-500"}`}
+          >
+            <Package className="h-4 w-4" aria-hidden="true" />
+            Inventário
+          </Button>
+          <Button
+            variant={activeTab === "compras" ? "danger" : "ghost"}
+            onClick={() => setActiveTab("compras")}
+            className={`min-h-12 flex-col gap-0.5 rounded-xl px-2 py-1.5 text-[11px] ${activeTab === "compras" ? "bg-rose-600 hover:bg-rose-700" : "text-slate-500"}`}
+          >
+            <span className="relative">
+              <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+              {lowStock.length > 0 && <span className="absolute -right-2 -top-2 min-w-4 rounded-full bg-rose-100 px-1 text-[9px] font-bold leading-4 text-rose-700">{lowStock.length}</span>}
+            </span>
+            Compras
+          </Button>
+          <Link
+            href="/receitas"
+            className="inline-flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-bold text-[#405a1d] transition-colors hover:bg-[#f3f8df] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9bd33f] focus-visible:ring-inset"
+          >
+            <ChefHat className="h-4 w-4" aria-hidden="true" />
+            Chef AI
+          </Link>
+          <Link
+            href="/configuracoes"
+            className="inline-flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-inset"
+            aria-label="Definições"
+          >
+            <Settings className="h-4 w-4" aria-hidden="true" />
+            Definições
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }
