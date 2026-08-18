@@ -94,7 +94,7 @@ test("generate screenshots", async ({ page }) => {
 
   // 01 — Dashboard (all items)
   await setupMocks(page);
-  await page.goto("/");
+  await page.goto("/inventario");
   await page.waitForSelector("ul li");
   await page.screenshot({ path: out("01-dashboard.png"), fullPage: true });
 

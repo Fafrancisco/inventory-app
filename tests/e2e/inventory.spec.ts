@@ -87,7 +87,7 @@ async function mockApi(
 test.describe("Inventory page", () => {
   test("loads and shows all items", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     for (const item of ITEMS) {
       await expect(page.getByText(item.nome)).toBeVisible();
@@ -99,7 +99,7 @@ test.describe("Inventory page", () => {
 
   test("dashboard has no automated accessibility violations", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     const results = await new AxeBuilder({ page }).analyze();
     expect(results.violations).toEqual([]);
@@ -107,7 +107,7 @@ test.describe("Inventory page", () => {
 
   test("shows low-stock badge on items at or below minimum", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     // Detergente has quantidade 1 <= stock_minimo 2 → "Baixo" badge
     const detergente = page.locator("li").filter({ hasText: "Detergente" });
@@ -120,7 +120,7 @@ test.describe("Inventory page", () => {
 
   test("increments item quantity when + is clicked", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     // quantity and unit are in separate spans
@@ -132,7 +132,7 @@ test.describe("Inventory page", () => {
 
   test("edits item quantity via keyboard input", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     await arrozItem.getByRole("button", { name: "Editar quantidade de Arroz" }).click();
@@ -146,7 +146,7 @@ test.describe("Inventory page", () => {
 
   test("decrements item quantity when − is clicked", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     await arrozItem.getByRole("button", { name: "Diminuir quantidade de Arroz" }).click();
@@ -156,7 +156,7 @@ test.describe("Inventory page", () => {
   test("− button is disabled when quantity is 0", async ({ page }) => {
     const zeroItems = [{ ...ITEMS[0], quantidade: 0 }];
     await mockApi(page, zeroItems);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     const arrozItem = page.locator("li").filter({ hasText: "Arroz" });
     await expect(arrozItem.getByRole("button", { name: "Diminuir quantidade de Arroz" })).toBeDisabled();
@@ -164,7 +164,7 @@ test.describe("Inventory page", () => {
 
   test("adds a new item via the form", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: "+ Novo" }).click();
     await page.getByPlaceholder("Nome do produto").fill("Leite");
@@ -184,7 +184,7 @@ test.describe("Inventory page", () => {
     ];
 
     await mockApi(page, ITEMS, products, locations);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: "+ Novo" }).click();
     await page.locator("form select").first().selectOption("Higiene Pessoal");
@@ -197,7 +197,7 @@ test.describe("Inventory page", () => {
 
   test("closing the add form hides it without adding an item", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: "+ Novo" }).click();
     await expect(page.getByPlaceholder("Nome do produto")).toBeVisible();
@@ -209,7 +209,7 @@ test.describe("Inventory page", () => {
 
   test("deletes an item when Apagar is clicked and confirmed", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
     page.on("dialog", (d) => d.accept());
 
     await page.locator("li").filter({ hasText: "Arroz" }).getByRole("button", { name: "Apagar" }).click();
@@ -218,7 +218,7 @@ test.describe("Inventory page", () => {
 
   test("location filter chips filter the item list", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     // Click the "Cozinha" chip — only Cozinha items should remain visible
     await page.getByRole("button", { name: /📍 Cozinha/ }).click();
@@ -233,7 +233,7 @@ test.describe("Inventory page", () => {
 
   test("category chips filter the item list", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: "Limpeza" }).click();
     await expect(page.getByText("Detergente")).toBeVisible();
@@ -245,7 +245,7 @@ test.describe("Inventory page", () => {
 
   test("Compras tab shows only low-stock items", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: /Compras/ }).click();
 
@@ -257,7 +257,7 @@ test.describe("Inventory page", () => {
   test("Compras shows checkmark when all items are in stock", async ({ page }) => {
     const fullStockItems = ITEMS.map((i) => ({ ...i, quantidade: i.stock_minimo + 5 }));
     await mockApi(page, fullStockItems);
-    await page.goto("/");
+    await page.goto("/inventario");
 
     await page.getByRole("button", { name: /Compras/ }).click();
     await expect(page.getByText("Tudo em stock!")).toBeVisible();

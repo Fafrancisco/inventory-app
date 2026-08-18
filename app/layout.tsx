@@ -5,10 +5,14 @@ export const metadata: Metadata = {
   title: "Inventory App",
   description: "Gestão de stock simplificada",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#12212b",
   width: "device-width",
   initialScale: 1,
 };
