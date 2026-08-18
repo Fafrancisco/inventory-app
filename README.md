@@ -48,7 +48,7 @@ Set the environment variable:
 POSTGRES_URL=******host/dbname
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
-GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image
 ```
 
 `GEMINI_API_KEY` must only be configured server-side (local env + Vercel Environment Variables).

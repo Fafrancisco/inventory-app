@@ -199,6 +199,6 @@ describe("/api/recipes route", () => {
     const body = await res.json();
     expect(body.generated).toBe(true);
     expect(body.recipe.title).toBe("Massa com atum");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

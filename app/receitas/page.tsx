@@ -160,6 +160,20 @@ export default function ReceitasPage() {
     }
   };
 
+  const generateRecipeImage = async (recipeId: number) => {
+    try {
+      const res = await fetch(`/api/recipes/${recipeId}/image`, { method: "POST" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.generatedImage) return;
+      setRecipes((prev) => prev.map((recipe) => (
+        recipe.id === recipeId ? { ...recipe, generatedImage: data.generatedImage } : recipe
+      )));
+    } catch {
+      // The recipe remains usable when optional image generation fails.
+    }
+  };
+
   const generateRecipe = async () => {
     setGenerating(true);
     setError(null);
@@ -190,6 +204,7 @@ export default function ReceitasPage() {
       }
 
       setRecipes((prev) => [data.recipe, ...prev]);
+  void generateRecipeImage(data.recipe.id);
       const missingCount = Array.isArray(data?.recipe?.missingIngredients)
         ? data.recipe.missingIngredients.length
         : 0;
