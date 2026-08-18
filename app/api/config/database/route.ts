@@ -9,56 +9,72 @@ const SAMPLE_STOCK = [
   ["Café", 3, 2, "Cozinha", "un"],
 ] as const;
 
+const SAMPLE_PRODUCTS = SAMPLE_STOCK.map(([nome, , , , unidade]) => [nome, unidade] as const);
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const action = body.action;
 
     if (action === "reset") {
-      if (body.confirmation !== "APAGAR") {
+      if (body.confirmation !== "LIMPAR") {
         return NextResponse.json(
-          { error: "Escreve APAGAR para confirmar a eliminação." },
+          { error: "Escreve LIMPAR para confirmar a operação." },
           { status: 400 }
         );
       }
 
-      await sql.begin(async (transaction) => {
-        await transaction`
-          TRUNCATE TABLE
-            recipe_ingredients,
-            recipes,
-            recipe_preferences,
-            stock_items,
-            products,
-            app_meta
-          RESTART IDENTITY CASCADE
-        `;
-      });
+      await sql`
+        UPDATE stock_items
+        SET quantidade = 0, updated_at = NOW()
+      `;
 
-      return NextResponse.json({ ok: true, message: "Base de dados limpa." });
+      return NextResponse.json({ ok: true, message: "Quantidades limpas." });
     }
 
     if (action === "seed-inventory") {
       const result = await sql.begin(async (transaction) => {
-        const seedLock = await transaction`
+        let productsInserted = 0;
+        for (const [nome, unidade] of SAMPLE_PRODUCTS) {
+          const productRows = await transaction`
+            INSERT INTO products (nome, unidade)
+            VALUES (${nome}, ${unidade})
+            ON CONFLICT (nome) DO NOTHING
+            RETURNING id
+          `;
+          productsInserted += productRows.length;
+        }
+
+        let inventoryInserted = 0;
+        for (const [nome, quantidade, stockMinimo, localizacao, unidade] of SAMPLE_STOCK) {
+          const stockRows = await transaction`
+            INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
+            SELECT ${nome}, ${quantidade}, ${stockMinimo}, ${localizacao}, ${unidade}
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM stock_items
+              WHERE stock_items.nome = ${nome}
+                AND stock_items.quantidade = ${quantidade}
+                AND stock_items.stock_minimo = ${stockMinimo}
+                AND stock_items.localizacao = ${localizacao}
+                AND stock_items.unidade = ${unidade}
+            )
+            RETURNING id
+          `;
+          inventoryInserted += stockRows.length;
+        }
+
+        await transaction`
           INSERT INTO app_meta (key, value)
           VALUES ('stock-sample-seed-v1', 'done')
           ON CONFLICT (key) DO NOTHING
-          RETURNING key
         `;
 
-        if (seedLock.length === 0) {
-          return { inserted: 0, alreadySeeded: true };
-        }
-
-        for (const [nome, quantidade, stockMinimo, localizacao, unidade] of SAMPLE_STOCK) {
-          await transaction`
-            INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
-            VALUES (${nome}, ${quantidade}, ${stockMinimo}, ${localizacao}, ${unidade})
-          `;
-        }
-
-        return { inserted: SAMPLE_STOCK.length, alreadySeeded: false };
+        return {
+          inserted: inventoryInserted,
+          productsInserted,
+          alreadySeeded: inventoryInserted === 0 && productsInserted === 0,
+        };
       });
 
       return NextResponse.json({ ok: true, ...result });

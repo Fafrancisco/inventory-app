@@ -228,7 +228,7 @@ export default function ConfiguracoesPage() {
   };
 
   const handleDatabaseAction = async (action: "reset" | "seed-inventory") => {
-    if (action === "reset" && resetConfirmation !== "APAGAR") return;
+    if (action === "reset" && resetConfirmation !== "LIMPAR") return;
 
     setDatabaseBusy(action === "reset" ? "reset" : "seed");
     setError(null);
@@ -248,10 +248,10 @@ export default function ConfiguracoesPage() {
 
       setDatabaseMessage(
         action === "reset"
-          ? "Base de dados limpa. O esquema foi preservado."
+          ? "Quantidades limpas. Os artigos, produtos e localizações foram mantidos."
           : data.alreadySeeded
-            ? "O inventário de demonstração já tinha sido preenchido."
-            : `Foram adicionados ${data.inserted} itens de demonstração ao inventário.`
+            ? "O inventário e os produtos de demonstração já estavam preenchidos."
+            : `Foram restaurados ${data.productsInserted} produto(s) e ${data.inserted} item(ns) de demonstração.`
       );
       setResetConfirmation("");
       await Promise.all([fetchProducts(), fetchLocations()]);
@@ -614,28 +614,28 @@ export default function ConfiguracoesPage() {
               <div className="flex items-start gap-3">
                 <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
                 <div>
-                  <h3 className="text-sm font-semibold text-red-900">Apagar todos os dados</h3>
-                  <p className="mt-1 text-xs text-slate-500">Remove inventário, produtos, receitas e preferências. As localizações e o esquema ficam intactos.</p>
+                  <h3 className="text-sm font-semibold text-red-900">Limpar quantidades</h3>
+                  <p className="mt-1 text-xs text-slate-500">Coloca todas as quantidades a zero e mantém os artigos, produtos, receitas e localizações.</p>
                 </div>
               </div>
               <label className="mt-3 block text-xs font-semibold text-red-800" htmlFor="reset-confirmation">
-                Escreve APAGAR para confirmar
+                Escreve LIMPAR para confirmar
               </label>
               <input
                 id="reset-confirmation"
                 value={resetConfirmation}
                 onChange={(event) => setResetConfirmation(event.target.value.toUpperCase())}
-                placeholder="APAGAR"
+                placeholder="LIMPAR"
                 className="mt-1 w-full rounded-xl border border-red-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
               <Button
                 type="button"
                 onClick={() => void handleDatabaseAction("reset")}
-                disabled={databaseBusy !== null || resetConfirmation !== "APAGAR"}
+                disabled={databaseBusy !== null || resetConfirmation !== "LIMPAR"}
                 className="mt-3 w-full bg-red-700 text-white hover:bg-red-800 disabled:bg-red-300"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {databaseBusy === "reset" ? "A apagar..." : "Apagar todos os dados"}
+                {databaseBusy === "reset" ? "A limpar..." : "Limpar quantidades"}
               </Button>
             </div>
           </div>
