@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Settings } from "lucide-react";
+import { ArrowLeft, Database, PackagePlus, Plus, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Product {
@@ -30,6 +30,9 @@ export default function ConfiguracoesPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [databaseBusy, setDatabaseBusy] = useState<"reset" | "seed" | null>(null);
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [databaseMessage, setDatabaseMessage] = useState<string | null>(null);
 
   const [newProduct, setNewProduct] = useState({ nome: "", unidade: "un", localizacao_padrao: "" });
   const [newLocation, setNewLocation] = useState("");
@@ -221,6 +224,41 @@ export default function ConfiguracoesPage() {
       cancelEditLocation();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
+    }
+  };
+
+  const handleDatabaseAction = async (action: "reset" | "seed-inventory") => {
+    if (action === "reset" && resetConfirmation !== "APAGAR") return;
+
+    setDatabaseBusy(action === "reset" ? "reset" : "seed");
+    setError(null);
+    setDatabaseMessage(null);
+
+    try {
+      const res = await fetch("/api/config/database", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          confirmation: action === "reset" ? resetConfirmation : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Não foi possível atualizar a base de dados.");
+
+      setDatabaseMessage(
+        action === "reset"
+          ? "Base de dados limpa. O esquema foi preservado."
+          : data.alreadySeeded
+            ? "O inventário de demonstração já tinha sido preenchido."
+            : `Foram adicionados ${data.inserted} itens de demonstração ao inventário.`
+      );
+      setResetConfirmation("");
+      await Promise.all([fetchProducts(), fetchLocations()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setDatabaseBusy(null);
     }
   };
 
@@ -542,6 +580,67 @@ export default function ConfiguracoesPage() {
           )}
         </section>
         </div>
+
+        <section className="mt-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+          <div className="border-b border-amber-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-amber-700" aria-hidden="true" />
+              <h2 className="font-semibold text-amber-950">Ferramentas de desenvolvimento</h2>
+            </div>
+            <p className="mt-1 text-xs text-amber-800">Ações diretas sobre os dados locais da aplicação.</p>
+          </div>
+
+          <div className="grid gap-4 p-4 md:grid-cols-2">
+            <div className="rounded-xl border border-amber-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                <PackagePlus className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Preencher inventário</h3>
+                  <p className="mt-1 text-xs text-slate-500">Adiciona os itens de demonstração uma única vez.</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={() => void handleDatabaseAction("seed-inventory")}
+                disabled={databaseBusy !== null}
+                className="mt-3 w-full bg-amber-700 text-white hover:bg-amber-800"
+              >
+                <PackagePlus className="h-4 w-4" aria-hidden="true" />
+                {databaseBusy === "seed" ? "A preencher..." : "Preencher inventário"}
+              </Button>
+            </div>
+
+            <div className="rounded-xl border border-red-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-semibold text-red-900">Apagar todos os dados</h3>
+                  <p className="mt-1 text-xs text-slate-500">Remove inventário, produtos, localizações, receitas e preferências. O esquema fica intacto.</p>
+                </div>
+              </div>
+              <label className="mt-3 block text-xs font-semibold text-red-800" htmlFor="reset-confirmation">
+                Escreve APAGAR para confirmar
+              </label>
+              <input
+                id="reset-confirmation"
+                value={resetConfirmation}
+                onChange={(event) => setResetConfirmation(event.target.value.toUpperCase())}
+                placeholder="APAGAR"
+                className="mt-1 w-full rounded-xl border border-red-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <Button
+                type="button"
+                onClick={() => void handleDatabaseAction("reset")}
+                disabled={databaseBusy !== null || resetConfirmation !== "APAGAR"}
+                className="mt-3 w-full bg-red-700 text-white hover:bg-red-800 disabled:bg-red-300"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {databaseBusy === "reset" ? "A apagar..." : "Apagar todos os dados"}
+              </Button>
+            </div>
+          </div>
+          {databaseMessage && <p className="border-t border-amber-200 px-4 py-3 text-sm font-medium text-emerald-700">{databaseMessage}</p>}
+        </section>
       </div>
     </div>
   );
