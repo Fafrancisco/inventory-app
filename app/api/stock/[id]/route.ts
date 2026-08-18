@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+function normalizeStockRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    quantidade: Number(row.quantidade),
+    stock_minimo: Number(row.stock_minimo),
+  };
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -57,7 +65,7 @@ export async function PATCH(
     if (rows.length === 0) {
       return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
     }
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(normalizeStockRow(rows[0]));
   } catch (error) {
     console.error("PATCH /api/stock/[id] failed:", error);
     return NextResponse.json(

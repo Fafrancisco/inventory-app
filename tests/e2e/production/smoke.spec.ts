@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Production smoke", () => {
   test("loads inventory and returns from Chef AI within the UX budget", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/inventario", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Inventário" })).toBeVisible();
 
     await page.getByRole("link", { name: "Chef AI" }).click();

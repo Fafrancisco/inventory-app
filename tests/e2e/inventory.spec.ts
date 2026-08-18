@@ -412,3 +412,104 @@ test.describe("Configurações page", () => {
     await expect(page.getByText("📍 Cozinha Principal")).toBeVisible();
   });
 });
+
+const EXPECTED_FILLED_STOCK = [
+  ["Arroz", "kg"],
+  ["Esparguete", "kg"],
+  ["Massa", "kg"],
+  ["Feijão", "kg"],
+  ["Grão-de-bico", "kg"],
+  ["Lentilhas", "kg"],
+  ["Farinha", "kg"],
+  ["Açúcar", "kg"],
+  ["Sal", "g"],
+  ["Azeite", "L"],
+  ["Óleo", "L"],
+  ["Vinagre", "L"],
+  ["Molho de tomate", "un"],
+  ["Polpa de tomate", "un"],
+  ["Atum", "un"],
+  ["Sardinha", "un"],
+  ["Leite", "L"],
+  ["Manteiga", "un"],
+  ["Ovos", "un"],
+  ["Queijo", "un"],
+  ["Iogurte", "un"],
+  ["Pão", "un"],
+  ["Tostas", "pac"],
+  ["Alho", "un"],
+  ["Cebola", "kg"],
+  ["Batata", "kg"],
+  ["Cenoura", "kg"],
+  ["Tomate", "kg"],
+  ["Alface", "un"],
+  ["Pimento", "un"],
+  ["Curgete", "kg"],
+  ["Salsa", "un"],
+  ["Coentros", "un"],
+  ["Limão", "un"],
+  ["Maçã", "kg"],
+  ["Banana", "kg"],
+  ["Legumes congelados", "kg"],
+  ["Peixe congelado", "kg"],
+] as const;
+
+test.describe("Database inventory fill", () => {
+  test("fills an empty stock database and persists + for every unit type", async ({ page }) => {
+    try {
+      await page.goto("/configuracoes");
+
+      await page.getByLabel("Escreve LIMPAR para confirmar").fill("LIMPAR");
+      await page.getByRole("button", { name: "Limpar quantidades", exact: true }).click();
+      await expect(page.getByText(/Quantidades limpas\. Os artigos, produtos e localizações foram mantidos\./).last()).toBeVisible();
+
+      const emptyResponse = await page.request.get("/api/stock");
+      expect(emptyResponse.ok()).toBeTruthy();
+      const emptyStock = await emptyResponse.json();
+      expect(emptyStock.every((item: { quantidade: number }) => item.quantidade === 0)).toBeTruthy();
+
+      await page.getByRole("button", { name: "Preencher inventário", exact: true }).click();
+      await expect(page.getByText(/Foram restaurados|já estavam preenchidos/)).toBeVisible();
+
+      const filledResponse = await page.request.get("/api/stock");
+      expect(filledResponse.ok()).toBeTruthy();
+      const filledStock = await filledResponse.json();
+      expect(filledStock.length).toBeGreaterThanOrEqual(EXPECTED_FILLED_STOCK.length);
+
+      for (const [nome, unidade] of EXPECTED_FILLED_STOCK) {
+        const item = filledStock.find((stockItem: { nome: string }) => stockItem.nome === nome);
+        expect(item, `produto esperado: ${nome}`).toMatchObject({ nome, quantidade: 1, unidade });
+      }
+
+      await page.goto("/inventario");
+      for (const [nome, unidade] of EXPECTED_FILLED_STOCK) {
+        const card = page.locator("li").filter({ has: page.getByText(nome, { exact: true }) }).first();
+        await expect(card).toBeVisible();
+        await expect(card).toContainText(unidade);
+        await expect(card.getByRole("button", { name: `Editar quantidade de ${nome}` })).toContainText("1");
+      }
+
+      const representativeItems = new Map<string, string>();
+      for (const [nome, unidade] of EXPECTED_FILLED_STOCK) {
+        if (!representativeItems.has(unidade)) representativeItems.set(unidade, nome);
+      }
+
+      for (const [unidade, nome] of representativeItems) {
+        const card = page.locator("li").filter({ has: page.getByText(nome, { exact: true }) }).first();
+        await card.getByRole("button", { name: `Aumentar quantidade de ${nome}` }).click();
+        await expect(card.getByRole("button", { name: `Editar quantidade de ${nome}` })).toContainText("2");
+      }
+
+      const updatedResponse = await page.request.get("/api/stock");
+      const updatedStock = await updatedResponse.json();
+      for (const [unidade, nome] of representativeItems) {
+        const item = updatedStock.find((stockItem: { nome: string }) => stockItem.nome === nome);
+        expect(item, `incremento persistido para ${unidade}`).toMatchObject({ nome, quantidade: 2, unidade });
+      }
+    } finally {
+      await page.request.post("/api/config/database", {
+        data: { action: "reset", confirmation: "LIMPAR" },
+      });
+    }
+  });
+});

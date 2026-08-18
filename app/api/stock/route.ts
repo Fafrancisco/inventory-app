@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+function normalizeStockRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    quantidade: Number(row.quantidade),
+    stock_minimo: Number(row.stock_minimo),
+  };
+}
+
 export async function GET() {
   try {
     const rows = await sql`
@@ -17,7 +25,7 @@ export async function GET() {
       LEFT JOIN products p ON p.nome = s.nome
       ORDER BY nome ASC
     `;
-    return NextResponse.json(rows);
+    return NextResponse.json(rows.map((row) => normalizeStockRow(row)));
   } catch (error) {
     console.error("GET /api/stock failed:", error);
     return NextResponse.json(
@@ -55,7 +63,7 @@ export async function POST(request: Request) {
       FROM inserted i
       LEFT JOIN products p ON p.nome = i.nome
     `;
-    return NextResponse.json(rows[0], { status: 201 });
+    return NextResponse.json(normalizeStockRow(rows[0]), { status: 201 });
   } catch (error) {
     console.error("POST /api/stock failed:", error);
     return NextResponse.json(
