@@ -30,7 +30,6 @@ export async function POST(request: Request) {
             recipe_preferences,
             stock_items,
             products,
-            locations,
             app_meta
           RESTART IDENTITY CASCADE
         `;

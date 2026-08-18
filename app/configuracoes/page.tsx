@@ -615,7 +615,7 @@ export default function ConfiguracoesPage() {
                 <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
                 <div>
                   <h3 className="text-sm font-semibold text-red-900">Apagar todos os dados</h3>
-                  <p className="mt-1 text-xs text-slate-500">Remove inventário, produtos, localizações, receitas e preferências. O esquema fica intacto.</p>
+                  <p className="mt-1 text-xs text-slate-500">Remove inventário, produtos, receitas e preferências. As localizações e o esquema ficam intactos.</p>
                 </div>
               </div>
               <label className="mt-3 block text-xs font-semibold text-red-800" htmlFor="reset-confirmation">
