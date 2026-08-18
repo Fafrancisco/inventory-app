@@ -115,7 +115,6 @@ CREATE TABLE IF NOT EXISTS app_meta (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Sample data (optional)
 -- Remove only exact duplicate seed rows left by older schema runs.
 WITH duplicate_stock_rows AS (
     SELECT id,
@@ -130,26 +129,6 @@ WHERE id IN (
     SELECT id
     FROM duplicate_stock_rows
     WHERE row_number > 1
-);
-
-INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
-SELECT seed.nome, seed.quantidade, seed.stock_minimo, seed.localizacao, seed.unidade
-FROM (
-    VALUES
-        ('Arroz', '5'::numeric, '2'::numeric, 'Cozinha', 'kg'),
-        ('Azeite', '2'::numeric, '1'::numeric, 'Cozinha', 'L'),
-        ('Detergente', '1'::numeric, '2'::numeric, 'Casa de banho', 'un'),
-        ('Papel higiénico', '4'::numeric, '6'::numeric, 'Casa de banho', 'un'),
-        ('Café', '3'::numeric, '2'::numeric, 'Cozinha', 'un')
-) AS seed(nome, quantidade, stock_minimo, localizacao, unidade)
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM stock_items existing
-    WHERE existing.nome = seed.nome
-      AND existing.quantidade = seed.quantidade
-      AND existing.stock_minimo = seed.stock_minimo
-      AND existing.localizacao = seed.localizacao
-      AND existing.unidade = seed.unidade
 );
 
 -- Seed common household products once per database

@@ -106,13 +106,21 @@ VERCEL_TOKEN
 
 ## 🗃️ Database Migrations
 
-Database schema changes use the separate, manual `Database Migration` workflow. Normal application requests do not create tables, alter columns, seed products, or enable RLS.
+Database schema changes use the separate, manual `Database Migration` workflow. Normal application requests do not create tables, alter columns, seed sample stock, or enable RLS. The schema still seeds the catalog of configurable products once through its ledger.
 
 Run locally when intentionally applying the checked-in schema:
 
 ```bash
 POSTGRES_URL=your-database-url npm run db:migrate
 ```
+
+Sample stock is opt-in and is inserted at most once:
+
+```bash
+POSTGRES_URL=your-database-url npm run db:seed
+```
+
+The seed command records `stock-sample-seed-v1` in `app_meta`; running it again does not add rows.
 
 For GitHub Actions, configure a protected `database-migration` environment with a `POSTGRES_URL` secret. Start **Actions → Database Migration → Run workflow**, and type `APPLY` as confirmation. The production gate does not run database migrations.
 

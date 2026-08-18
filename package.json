@@ -13,6 +13,7 @@
     "test:e2e:prod": "playwright test --config=playwright.production.config.ts",
     "test:e2e:prod:mutating": "PROD_MUTATING=true playwright test --config=playwright.production.config.ts tests/e2e/production/mutating.spec.ts",
     "db:migrate": "node scripts/migrate-db.mjs",
+    "db:seed": "node scripts/seed-sample-stock.mjs",
     "import:products": "node scripts/import-products-openfoodfacts.mjs",
     "products:cleanup:pt": "node scripts/cleanup-products-pt.mjs",
     "products:reset:basics": "node scripts/reset-products-basics.mjs"
