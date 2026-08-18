@@ -121,6 +121,35 @@ describe("/api/recipes route", () => {
       text: async () => "",
     });
 
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify({
+                title: "Massa com atum",
+                summary: "Receita simples",
+                servings: 2,
+                prepMinutes: 10,
+                cookMinutes: 12,
+                instructions: ["Cozer a massa", "Juntar o atum"],
+                ingredients: [
+                  { nome: "Massa", quantidade: "200", unidade: "g", available: true, notes: "" },
+                ],
+              }) }],
+            },
+          },
+        ],
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: "aW1hZ2U=" } }] } }],
+      }),
+    });
+
     vi.stubGlobal("fetch", fetchMock);
 
     mockSql
@@ -170,6 +199,6 @@ describe("/api/recipes route", () => {
     const body = await res.json();
     expect(body.generated).toBe(true);
     expect(body.recipe.title).toBe("Massa com atum");
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

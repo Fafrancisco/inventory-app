@@ -48,9 +48,11 @@ Set the environment variable:
 POSTGRES_URL=******host/dbname
 GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-2.5-flash
+GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
 ```
 
 `GEMINI_API_KEY` must only be configured server-side (local env + Vercel Environment Variables).
+`GEMINI_IMAGE_MODEL` must reference an image-capable Gemini model. Each generated recipe requests a plated-dish image and stores the returned image with the recipe; if the image request fails, the text recipe is still saved.
 
 ## 🛠️ Development
 

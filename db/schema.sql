@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS recipes (
 CREATE INDEX IF NOT EXISTS idx_recipes_created_at ON recipes (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_recipes_generation_mode ON recipes (generation_mode);
 
+-- Generated dish preview returned by the image-capable Gemini model.
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS generated_image_data TEXT;
+
 -- Ingredient rows normalized for filtering and future analytics
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
     id         SERIAL PRIMARY KEY,

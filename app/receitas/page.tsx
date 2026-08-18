@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ChefHat, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, ChefHat, ImagePlus, RefreshCw, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Recipe = {
@@ -28,6 +28,7 @@ type Recipe = {
   }>;
   generationMode: string;
   isFavorite?: boolean;
+  generatedImage?: string | null;
   createdAt: string;
 };
 
@@ -39,6 +40,12 @@ type Preferences = {
   notes: string;
   auto_suggest_enabled: boolean;
   auto_suggest_cooldown_minutes: number;
+};
+
+type ReferenceImage = {
+  name: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  dataUrl: string;
 };
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -61,6 +68,7 @@ export default function ReceitasPage() {
   const [updatingRecipeId, setUpdatingRecipeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [referenceImage, setReferenceImage] = useState<ReferenceImage | null>(null);
 
   const normalizeComparable = (value: string) =>
     value
@@ -93,6 +101,35 @@ export default function ReceitasPage() {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  const handleReferenceImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedTypes.has(file.type)) {
+      setError("Escolhe uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 2 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      setReferenceImage({
+        name: file.name,
+        mimeType: file.type as ReferenceImage["mimeType"],
+        dataUrl: reader.result,
+      });
+      setError(null);
+    };
+    reader.onerror = () => setError("Não foi possível ler a imagem.");
+    reader.readAsDataURL(file);
+  };
 
   const savePreferences = async () => {
     setSaving(true);
@@ -131,7 +168,15 @@ export default function ReceitasPage() {
       const res = await fetch("/api/recipes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "manual" }),
+        body: JSON.stringify({
+          mode: "manual",
+          image: referenceImage
+            ? {
+                mimeType: referenceImage.mimeType,
+                data: referenceImage.dataUrl.split(",")[1],
+              }
+            : undefined,
+        }),
       });
       const data = await res.json();
 
@@ -422,6 +467,30 @@ export default function ReceitasPage() {
               />
             </div>
 
+            <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cddf9a] bg-[#f8fbe9] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#405a1d]">Imagem de referência</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Opcional. Usa uma foto de ingredientes ou de um prato como contexto.</p>
+                </div>
+                <ImagePlus className="h-5 w-5 shrink-0 text-[#789b35]" aria-hidden="true" />
+              </div>
+              <label className="mt-3 inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#b8d477] bg-white px-3 py-2 text-sm font-semibold text-[#405a1d] transition-colors hover:bg-[#f3f8df] focus-within:ring-2 focus-within:ring-[#9bd33f]">
+                <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                Escolher imagem
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleReferenceImageChange} className="sr-only" />
+              </label>
+              {referenceImage && (
+                <div className="mt-3 flex items-center gap-3 rounded-xl border border-[#d8e8ad] bg-white p-2">
+                  <img src={referenceImage.dataUrl} alt="Pré-visualização da imagem de referência" className="h-16 w-16 rounded-lg object-cover" />
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{referenceImage.name}</span>
+                  <button type="button" onClick={() => setReferenceImage(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9bd33f]" aria-label="Remover imagem de referência">
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -514,6 +583,14 @@ export default function ReceitasPage() {
                       </button>
                     </div>
                   </div>
+
+                  {recipe.generatedImage && (
+                    <img
+                      src={recipe.generatedImage}
+                      alt={`Imagem sugerida para ${recipe.title}`}
+                      className="mt-3 aspect-[16/9] w-full rounded-xl object-cover"
+                    />
+                  )}
 
                   <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">
                     {recipe.servings ? <span className="bg-slate-100 px-2 py-0.5 rounded-full">{recipe.servings} porções</span> : null}

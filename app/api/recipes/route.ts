@@ -46,6 +46,11 @@ type GeneratedRecipe = {
   ingredients: GeneratedIngredient[];
 };
 
+type RecipeImage = {
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  data: string;
+};
+
 type MissingIngredient = {
   nome: string;
   quantidade: string;
@@ -64,6 +69,7 @@ type RecipeRecord = {
   instructions_json: unknown;
   generation_mode: string;
   is_favorite: boolean;
+  generated_image_data: string | null;
   created_at: string;
 };
 
@@ -77,6 +83,7 @@ class GeminiApiError extends Error {
 }
 
 const DEFAULT_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image";
 const GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-2.5-flash"];
 const CONTEXT_RECIPES_LIMIT = 5;
 const CONTEXT_RECIPE_SUMMARY_MAX_LEN = 220;
@@ -390,7 +397,75 @@ function extractQuotaMessage(payload: unknown): string | null {
   return message || null;
 }
 
-async function callGemini(prompt: string): Promise<GeneratedRecipe> {
+function parseRecipeImage(value: unknown): RecipeImage | null {
+  const image = parseJsonObject<Record<string, unknown>>(value, {});
+  const mimeType = image.mimeType;
+  const data = image.data;
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+  if (typeof mimeType !== "string" || !allowedTypes.has(mimeType)) return null;
+  if (typeof data !== "string" || !/^[A-Za-z0-9+/=]+$/.test(data)) return null;
+  if (data.length > 2_800_000) {
+    throw new Error("A imagem deve ter no máximo 2 MB");
+  }
+
+  return { mimeType: mimeType as RecipeImage["mimeType"], data };
+}
+
+function recipeImagePrompt(recipe: GeneratedRecipe): string {
+  const ingredients = recipe.ingredients
+    .slice(0, 12)
+    .map((ingredient) => `${ingredient.quantidade} ${ingredient.unidade} ${ingredient.nome}`.trim())
+    .join(", ");
+
+  return [
+    "Generate one appealing, realistic food photograph of the finished recipe below.",
+    "Show the complete plated dish ready to eat, with natural lighting and a clean home kitchen setting.",
+    "The image must contain no text, labels, logos, people, or extra dishes.",
+    `Recipe: ${recipe.title}`,
+    `Description: ${recipe.summary}`,
+    `Ingredients: ${ingredients}`,
+  ].join("\n");
+}
+
+async function callGeminiImage(recipe: GeneratedRecipe): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const modelPath = normalizeModelNameForApi(DEFAULT_IMAGE_MODEL);
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: recipeImagePrompt(recipe) }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+
+  const imagePart = parts.find((part: { inlineData?: { mimeType?: string; data?: string } }) => {
+    const mimeType = part.inlineData?.mimeType;
+    return Boolean(part.inlineData?.data && typeof mimeType === "string" && mimeType.startsWith("image/"));
+  });
+
+  const mimeType = imagePart?.inlineData?.mimeType;
+  const data = imagePart?.inlineData?.data;
+  if (!mimeType || !data || !/^[A-Za-z0-9+/=]+$/.test(data)) return null;
+
+  return `data:${mimeType};base64,${data}`;
+}
+
+async function callGemini(prompt: string, image: RecipeImage | null): Promise<GeneratedRecipe> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY não configurada");
@@ -410,7 +485,13 @@ async function callGemini(prompt: string): Promise<GeneratedRecipe> {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          contents: [{
+            role: "user",
+            parts: [
+              { text: prompt },
+              ...(image ? [{ inline_data: { mime_type: image.mimeType, data: image.data } }] : []),
+            ],
+          }],
           generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.4,
@@ -502,7 +583,7 @@ async function getPreferences(): Promise<RecipePreferenceRow> {
 
 async function getRecipes(limit = 20): Promise<RecipeRecord[]> {
   return sql<RecipeRecord[]>`
-    SELECT id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, created_at
+    SELECT id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, generated_image_data, created_at
     FROM recipes
     ORDER BY created_at DESC
     LIMIT ${Math.min(Math.max(limit, 1), 50)}
@@ -544,6 +625,7 @@ export async function GET(request: Request) {
           instructions: parseJsonArray(recipe.instructions_json),
           generationMode: recipe.generation_mode,
           isFavorite: recipe.is_favorite,
+          generatedImage: recipe.generated_image_data,
           createdAt: recipe.created_at,
         };
       }),
@@ -609,6 +691,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "auto" ? "auto" : "manual";
     const force = Boolean(body.force);
+    const image = parseRecipeImage(body.image);
 
     const [inventory, preferences, contextRecipes] = await Promise.all([
       sql<StockRow[]>`
@@ -666,12 +749,18 @@ export async function POST(request: Request) {
     }
 
     const prompt = buildGeminiPrompt(edibleInventory, preferences, contextRecipes);
-    const generated = await callGemini(prompt);
+    const generated = await callGemini(prompt, image);
+    let generatedImage: string | null = null;
+    try {
+      generatedImage = await callGeminiImage(generated);
+    } catch (imageError) {
+      console.warn("Recipe image generation failed:", imageError instanceof Error ? imageError.message : "unknown error");
+    }
     const enriched = enrichWithAvailability(generated, edibleInventory);
     const contextIds = contextRecipes.map((recipe: ContextRecipeRow) => recipe.id);
 
     const inserted = await sql<
-      { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; is_favorite: boolean; created_at: string }[]
+      { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; is_favorite: boolean; generated_image_data: string | null; created_at: string }[]
     >`
       INSERT INTO recipes (
         title,
@@ -684,7 +773,8 @@ export async function POST(request: Request) {
         source_inventory_json,
         context_recipe_ids_json,
         generation_mode,
-        inventory_signature
+        inventory_signature,
+        generated_image_data
       )
       VALUES (
         ${generated.title},
@@ -697,9 +787,10 @@ export async function POST(request: Request) {
         ${JSON.stringify(edibleInventory)}::jsonb,
         ${JSON.stringify(contextIds)}::jsonb,
         ${mode},
-        ${inventorySignature}
+        ${inventorySignature},
+        ${generatedImage}
       )
-      RETURNING id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, created_at
+      RETURNING id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, generated_image_data, created_at
     `;
 
     const recipe = inserted[0];
@@ -726,6 +817,7 @@ export async function POST(request: Request) {
           instructions: parseJsonArray(recipe.instructions_json),
           generationMode: recipe.generation_mode,
           isFavorite: recipe.is_favorite,
+          generatedImage: recipe.generated_image_data,
           createdAt: recipe.created_at,
         },
       },
