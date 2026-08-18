@@ -70,9 +70,14 @@ describe("PATCH /api/stock/[id]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when delta is not an integer", async () => {
+  it("accepts decimal deltas for decimal-unit stock", async () => {
+    const updated = makeItem({ quantidade: 6.5, unidade: "kg" });
+    mockSql.mockResolvedValueOnce([updated]);
+
     const res = await PATCH(makeRequest({ delta: 1.5 }), { params: makeParams("1") });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.quantidade).toBe(6.5);
   });
 
   it("returns 400 when delta is missing", async () => {

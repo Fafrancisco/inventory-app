@@ -6,7 +6,6 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await ensureSchema();
     const { id } = await params;
     const itemId = Number(id);
     if (!Number.isInteger(itemId) || itemId <= 0) {
@@ -23,6 +22,8 @@ export async function PATCH(
         { status: 400 }
       );
     }
+
+    await ensureSchema();
 
     let rows;
     if (hasStockMinimo) {
