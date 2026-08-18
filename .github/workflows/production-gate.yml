@@ -1,0 +1,140 @@
+name: Production Gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_on_failure:
+        description: Promote the previous ready deployment if the smoke gate fails
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: production-gate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROD_BASE_URL: https://inventory-app-eta-cyan.vercel.app
+  VERCEL_ORG_ID: team_DR5qTYBEFxyKbi4OlEJ8xTPB
+  VERCEL_PROJECT_ID: prj_ErMFFVAHMJdfaJuzygtznl4LYg6w
+
+jobs:
+  smoke:
+    name: Production Playwright smoke gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for the matching Vercel production deployment
+        id: deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "VERCEL_TOKEN is required to identify the deployment for ${GITHUB_SHA}" >&2
+            exit 1
+          fi
+
+          for attempt in $(seq 1 30); do
+            deployments="$(curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_ORG_ID}&target=production&limit=20")"
+
+            deployment_url="$(printf '%s' "${deployments}" | jq -r --arg sha "${GITHUB_SHA}" '
+              [.deployments[] | select(.state == "READY" and .meta.githubCommitSha == $sha)]
+              | sort_by(.createdAt) | reverse | .[0].url // empty
+            ')"
+
+            if [ -n "${deployment_url}" ]; then
+              echo "deployment_url=https://${deployment_url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            echo "Waiting for Vercel deployment for ${GITHUB_SHA} (${attempt}/30)"
+            sleep 10
+          done
+
+          echo "No ready Vercel deployment found for ${GITHUB_SHA}" >&2
+          exit 1
+
+      - name: Run read-only production gate
+        env:
+          PROD_BASE_URL: ${{ steps.deployment.outputs.deployment_url }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: npm run test:e2e:prod
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  rollback:
+    name: Roll back failed production gate
+    needs: smoke
+    if: >-
+      ${{ failure() &&
+      (github.event_name != 'workflow_dispatch' || inputs.rollback_on_failure) &&
+      env.HAS_VERCEL_TOKEN == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HAS_VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN != '' }}
+    steps:
+      - name: Find the previous ready production deployment
+        id: previous
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          deployments="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_ORG_ID}&target=production&limit=20")"
+
+          previous_uid="$(printf '%s' "${deployments}" | jq -r --arg sha "${GITHUB_SHA}" '
+            [.deployments[] | select(.state == "READY" and .meta.githubCommitSha != $sha)]
+            | sort_by(.createdAt) | reverse | .[0].uid // empty
+          ')"
+
+          if [ -z "${previous_uid}" ]; then
+            echo "No previous ready production deployment found" >&2
+            exit 1
+          fi
+
+          echo "deployment_uid=${previous_uid}" >> "${GITHUB_OUTPUT}"
+
+      - name: Promote previous deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx --yes vercel@latest promote "${{ steps.previous.outputs.deployment_uid }}" \
+            --scope "${VERCEL_ORG_ID}" \
+            --token "${VERCEL_TOKEN}" \
+            --yes
+
+      - name: Report rollback
+        run: echo "Production smoke gate failed; previous ready deployment was promoted."

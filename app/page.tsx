@@ -369,25 +369,25 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/40">
-        <header className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 pt-5 pb-4 shadow-lg">
-          <div className="max-w-lg mx-auto">
-            <div className="h-7 w-36 bg-white/20 rounded-lg animate-pulse" />
-            <div className="h-4 w-24 bg-white/15 rounded mt-2 animate-pulse" />
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <div className="h-14 bg-white/15 rounded-xl animate-pulse" />
-              <div className="h-14 bg-white/15 rounded-xl animate-pulse" />
+      <div className="min-h-screen">
+        <header className="bg-[#12212b] px-4 pb-5 pt-6 text-white shadow-[0_12px_40px_rgb(18_33_43/0.18)]">
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-2 h-3 w-28 rounded bg-[#c7f36b]/40 animate-pulse" />
+            <div className="h-7 w-36 rounded-lg bg-white/20 animate-pulse" />
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="h-16 rounded-2xl bg-white/10 animate-pulse" />
+              <div className="h-16 rounded-2xl bg-white/10 animate-pulse" />
             </div>
           </div>
         </header>
-        <div className="max-w-lg mx-auto px-4 pt-4 space-y-2.5">
+        <div className="mx-auto max-w-2xl space-y-3 px-4 pb-32 pt-5 sm:px-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-2xl shadow-sm overflow-hidden flex animate-pulse">
-              <div className="w-1 bg-slate-200 shrink-0" />
-              <div className="flex-1 px-4 py-4">
-                <div className="h-4 w-2/3 bg-slate-200 rounded mb-3" />
-                <div className="h-3 w-1/3 bg-slate-100 rounded mb-3" />
-                <div className="h-1.5 w-full bg-slate-100 rounded-full" />
+            <div key={i} className="flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgb(15_23_42/0.04)] animate-pulse">
+              <div className="w-1 shrink-0 bg-slate-200" />
+              <div className="flex-1 px-5 py-4">
+                <div className="mb-3 h-4 w-2/3 rounded bg-slate-200" />
+                <div className="mb-3 h-3 w-1/3 rounded bg-slate-100" />
+                <div className="h-2 w-full rounded-full bg-slate-100" />
               </div>
             </div>
           ))}

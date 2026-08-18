@@ -79,6 +79,29 @@ npm run test:e2e:prod
 
 Run this against a staging deployment first. Add authenticated or mutating scenarios only with a disposable test account and explicit test data cleanup.
 
+The opt-in mutating flow creates a uniquely named item, exercises quantity changes and Chef AI, then removes all stock and recipe records created during the test. It is not included in `test:e2e:prod`:
+
+```bash
+PROD_BASE_URL=https://your-deployment.example.com \
+VERCEL_PROTECTION_BYPASS=your-secret \
+npm run test:e2e:prod:mutating
+```
+
+Run it only against a staging database or an isolated test account. The cleanup is best-effort and should not be treated as a substitute for a disposable database.
+
+## 🚦 Production CI/CD Gate
+
+The `Production Gate` workflow runs the read-only Playwright suite after pushes to `main`. It polls Vercel until the exact GitHub commit has a ready production deployment, tests that immutable deployment URL, sends the Deployment Protection bypass header, and uploads Playwright evidence. If the gate fails, it promotes the previous ready production deployment.
+
+Configure these GitHub repository secrets:
+
+```text
+VERCEL_PROTECTION_BYPASS
+VERCEL_TOKEN
+```
+
+`VERCEL_TOKEN` is used to identify the exact deployment for the commit and by the failure rollback job. The workflow never runs the mutating production suite.
+
 ## 📸 Playwright Evidence
 
 All screenshots were captured with Playwright on a simulated **iPhone 14 Pro** viewport (390×844 @2x):

@@ -257,7 +257,7 @@ export default function ConfiguracoesPage() {
             onClick={() => setActiveSection("products")}
             className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
               activeSection === "products"
-                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm"
+                ? "bg-[#12212b] text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
             }`}
           >
@@ -268,7 +268,7 @@ export default function ConfiguracoesPage() {
             onClick={() => setActiveSection("locations")}
             className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
               activeSection === "locations"
-                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm"
+                ? "bg-[#12212b] text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
             }`}
           >

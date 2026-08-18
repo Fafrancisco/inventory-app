@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:prod": "playwright test --config=playwright.production.config.ts",
+    "test:e2e:prod:mutating": "PROD_MUTATING=true playwright test --config=playwright.production.config.ts tests/e2e/production/mutating.spec.ts",
     "import:products": "node scripts/import-products-openfoodfacts.mjs",
     "products:cleanup:pt": "node scripts/cleanup-products-pt.mjs",
     "products:reset:basics": "node scripts/reset-products-basics.mjs"
