@@ -48,9 +48,26 @@ export async function DELETE(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    const rows = await sql`
-      DELETE FROM locations WHERE id = ${itemId} RETURNING id
-    `;
+    const rows = await sql.begin(async (transaction) => {
+      const deletedRows = await transaction`
+        DELETE FROM locations WHERE id = ${itemId} RETURNING id, nome
+      `;
+
+      if (deletedRows.length > 0) {
+        await transaction`
+          UPDATE products
+          SET localizacao_padrao = NULL
+          WHERE localizacao_padrao = ${deletedRows[0].nome}
+        `;
+        await transaction`
+          UPDATE stock_items
+          SET localizacao = ''
+          WHERE localizacao = ${deletedRows[0].nome}
+        `;
+      }
+
+      return deletedRows;
+    });
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Localização não encontrada" }, { status: 404 });

@@ -25,6 +25,15 @@ export async function POST(request: Request) {
     const defaultLocation =
       typeof localizacao_padrao === "string" ? localizacao_padrao.trim() : "";
 
+    if (defaultLocation) {
+      const locationRows = await sql`
+        SELECT id FROM locations WHERE nome = ${defaultLocation} LIMIT 1
+      `;
+      if (locationRows.length === 0) {
+        return NextResponse.json({ error: "Localização não encontrada" }, { status: 400 });
+      }
+    }
+
     const rows = await sql`
       INSERT INTO products (nome, unidade, localizacao_padrao)
       VALUES (${nome.trim()}, ${unidade}, ${defaultLocation || null})

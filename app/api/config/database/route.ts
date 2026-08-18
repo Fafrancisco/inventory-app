@@ -42,8 +42,33 @@ const COMMON_RECIPE_PRODUCTS = [
   ["Peixe congelado", "kg"],
 ] as const;
 
+const SEED_LOCATIONS = ["Armário", "Congelador", "Congelador Arrecadação", "Frigorífico"] as const;
+const REFRIGERATED_PRODUCTS = new Set([
+  "Leite",
+  "Manteiga",
+  "Ovos",
+  "Queijo",
+  "Iogurte",
+  "Alface",
+  "Pimento",
+  "Curgete",
+  "Salsa",
+  "Coentros",
+  "Limão",
+  "Maçã",
+  "Banana",
+]);
+const FROZEN_PRODUCTS = new Set(["Legumes congelados", "Peixe congelado"]);
+
+function getSeedLocation(nome: string): string {
+  if (nome === "Peixe congelado") return "Congelador";
+  if (FROZEN_PRODUCTS.has(nome)) return "Congelador Arrecadação";
+  if (REFRIGERATED_PRODUCTS.has(nome)) return "Frigorífico";
+  return "Armário";
+}
+
 const SAMPLE_PRODUCTS = COMMON_RECIPE_PRODUCTS;
-const STOCK_FILL = COMMON_RECIPE_PRODUCTS.map(([nome, unidade]) => [nome, 1, 1, "", unidade] as const);
+const STOCK_FILL = COMMON_RECIPE_PRODUCTS.map(([nome, unidade]) => [nome, 1, 1, getSeedLocation(nome), unidade] as const);
 
 export async function POST(request: Request) {
   try {
@@ -68,6 +93,14 @@ export async function POST(request: Request) {
 
     if (action === "seed-inventory") {
       const result = await sql.begin(async (transaction) => {
+        for (const locationName of SEED_LOCATIONS) {
+          await transaction`
+            INSERT INTO locations (nome)
+            VALUES (${locationName})
+            ON CONFLICT (nome) DO NOTHING
+          `;
+        }
+
         let productsInserted = 0;
         const productsAdded: string[] = [];
         for (const [nome, unidade] of SAMPLE_PRODUCTS) {
@@ -79,6 +112,12 @@ export async function POST(request: Request) {
           `;
           productsInserted += productRows.length;
           if (productRows.length > 0) productsAdded.push(nome);
+
+          await transaction`
+            UPDATE products
+            SET localizacao_padrao = ${getSeedLocation(nome)}
+            WHERE nome = ${nome}
+          `;
         }
 
         let inventoryInserted = 0;
@@ -89,6 +128,7 @@ export async function POST(request: Request) {
           const existingRows = await transaction`
             UPDATE stock_items
             SET quantidade = GREATEST(quantidade, ${quantidade}),
+                localizacao = ${localizacao},
                 updated_at = NOW()
             WHERE nome = ${nome}
             RETURNING id

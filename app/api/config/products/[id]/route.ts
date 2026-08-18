@@ -22,6 +22,15 @@ export async function PUT(
     const defaultLocation =
       typeof localizacao_padrao === "string" ? localizacao_padrao.trim() : "";
 
+    if (defaultLocation) {
+      const locationRows = await sql`
+        SELECT id FROM locations WHERE nome = ${defaultLocation} LIMIT 1
+      `;
+      if (locationRows.length === 0) {
+        return NextResponse.json({ error: "Localização não encontrada" }, { status: 400 });
+      }
+    }
+
     const rows = await sql`
       UPDATE products
       SET
