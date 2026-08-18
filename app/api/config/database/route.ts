@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-const SAMPLE_STOCK = [
-  ["Arroz", 5, 2, "Cozinha", "kg"],
-  ["Azeite", 2, 1, "Cozinha", "L"],
-  ["Detergente", 1, 2, "Casa de banho", "un"],
-  ["Papel higiénico", 4, 6, "Casa de banho", "un"],
-  ["Café", 3, 2, "Cozinha", "un"],
-] as const;
-
 const COMMON_RECIPE_PRODUCTS = [
   ["Arroz", "kg"],
   ["Esparguete", "kg"],
@@ -51,6 +43,7 @@ const COMMON_RECIPE_PRODUCTS = [
 ] as const;
 
 const SAMPLE_PRODUCTS = COMMON_RECIPE_PRODUCTS;
+const STOCK_FILL = COMMON_RECIPE_PRODUCTS.map(([nome, unidade]) => [nome, 1, 1, "", unidade] as const);
 
 export async function POST(request: Request) {
   try {
@@ -87,22 +80,23 @@ export async function POST(request: Request) {
         }
 
         let inventoryInserted = 0;
-        for (const [nome, quantidade, stockMinimo, localizacao, unidade] of SAMPLE_STOCK) {
-          const stockRows = await transaction`
-            INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
-            SELECT ${nome}, ${quantidade}, ${stockMinimo}, ${localizacao}, ${unidade}
-            WHERE NOT EXISTS (
-              SELECT 1
-              FROM stock_items
-              WHERE stock_items.nome = ${nome}
-                AND stock_items.quantidade = ${quantidade}
-                AND stock_items.stock_minimo = ${stockMinimo}
-                AND stock_items.localizacao = ${localizacao}
-                AND stock_items.unidade = ${unidade}
-            )
+        for (const [nome, quantidade, stockMinimo, localizacao, unidade] of STOCK_FILL) {
+          const existingRows = await transaction`
+            UPDATE stock_items
+            SET quantidade = GREATEST(quantidade, ${quantidade}),
+                updated_at = NOW()
+            WHERE nome = ${nome}
             RETURNING id
           `;
-          inventoryInserted += stockRows.length;
+
+          if (existingRows.length === 0) {
+            const stockRows = await transaction`
+              INSERT INTO stock_items (nome, quantidade, stock_minimo, localizacao, unidade)
+              VALUES (${nome}, ${quantidade}, ${stockMinimo}, ${localizacao}, ${unidade})
+              RETURNING id
+            `;
+            inventoryInserted += stockRows.length;
+          }
         }
 
         await transaction`

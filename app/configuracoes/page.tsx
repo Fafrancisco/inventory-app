@@ -251,7 +251,7 @@ export default function ConfiguracoesPage() {
           ? "Quantidades limpas. Os artigos, produtos e localizações foram mantidos."
           : data.alreadySeeded
             ? "O inventário e os produtos de demonstração já estavam preenchidos."
-            : `Foram restaurados ${data.productsInserted} produto(s) e ${data.inserted} artigo(s) de demonstração.`
+            : `Foram restaurados ${data.productsInserted} produto(s) e ${data.inserted} unidade(s) de stock.`
       );
       setResetConfirmation("");
       await Promise.all([fetchProducts(), fetchLocations()]);
@@ -596,7 +596,7 @@ export default function ConfiguracoesPage() {
                 <PackagePlus className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">Preencher inventário</h3>
-                  <p className="mt-1 text-xs text-slate-500">Repõe produtos comuns para receitas e alguns artigos de demonstração.</p>
+                  <p className="mt-1 text-xs text-slate-500">Repõe produtos comuns e cria uma unidade de stock para cada produto.</p>
                 </div>
               </div>
               <Button
