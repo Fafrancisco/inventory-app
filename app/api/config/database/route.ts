@@ -9,7 +9,48 @@ const SAMPLE_STOCK = [
   ["Café", 3, 2, "Cozinha", "un"],
 ] as const;
 
-const SAMPLE_PRODUCTS = SAMPLE_STOCK.map(([nome, , , , unidade]) => [nome, unidade] as const);
+const COMMON_RECIPE_PRODUCTS = [
+  ["Arroz", "kg"],
+  ["Esparguete", "kg"],
+  ["Massa", "kg"],
+  ["Feijão", "kg"],
+  ["Grão-de-bico", "kg"],
+  ["Lentilhas", "kg"],
+  ["Farinha", "kg"],
+  ["Açúcar", "kg"],
+  ["Sal", "g"],
+  ["Azeite", "L"],
+  ["Óleo", "L"],
+  ["Vinagre", "L"],
+  ["Molho de tomate", "un"],
+  ["Polpa de tomate", "un"],
+  ["Atum", "un"],
+  ["Sardinha", "un"],
+  ["Leite", "L"],
+  ["Manteiga", "un"],
+  ["Ovos", "un"],
+  ["Queijo", "un"],
+  ["Iogurte", "un"],
+  ["Pão", "un"],
+  ["Tostas", "pac"],
+  ["Alho", "un"],
+  ["Cebola", "kg"],
+  ["Batata", "kg"],
+  ["Cenoura", "kg"],
+  ["Tomate", "kg"],
+  ["Alface", "un"],
+  ["Pimento", "un"],
+  ["Curgete", "kg"],
+  ["Salsa", "un"],
+  ["Coentros", "un"],
+  ["Limão", "un"],
+  ["Maçã", "kg"],
+  ["Banana", "kg"],
+  ["Legumes congelados", "kg"],
+  ["Peixe congelado", "kg"],
+] as const;
+
+const SAMPLE_PRODUCTS = COMMON_RECIPE_PRODUCTS;
 
 export async function POST(request: Request) {
   try {
