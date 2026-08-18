@@ -128,12 +128,17 @@ export default function Home() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    const [pRes, lRes] = await Promise.all([
-      fetch("/api/config/products"),
-      fetch("/api/config/locations"),
-    ]);
-    if (pRes.ok) setConfigProducts(await pRes.json());
-    if (lRes.ok) setConfigLocations(await lRes.json());
+    try {
+      const [pRes, lRes] = await Promise.all([
+        fetch("/api/config/products"),
+        fetch("/api/config/locations"),
+      ]);
+      if (!pRes.ok || !lRes.ok) throw new Error("Erro ao carregar configurações");
+      setConfigProducts(await pRes.json());
+      setConfigLocations(await lRes.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar configurações");
+    }
   }, []);
 
   const triggerAutoRecipeSuggestion = useCallback(async () => {
@@ -366,35 +371,6 @@ export default function Home() {
   };
 
   const displayItems = activeTab === "inventario" ? filtered : lowStock;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen">
-        <header className="bg-[#12212b] px-4 pb-5 pt-6 text-white shadow-[0_12px_40px_rgb(18_33_43/0.18)]">
-          <div className="mx-auto max-w-2xl">
-            <div className="mb-2 h-3 w-28 rounded bg-[#c7f36b]/40 animate-pulse" />
-            <div className="h-7 w-36 rounded-lg bg-white/20 animate-pulse" />
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="h-16 rounded-2xl bg-white/10 animate-pulse" />
-              <div className="h-16 rounded-2xl bg-white/10 animate-pulse" />
-            </div>
-          </div>
-        </header>
-        <div className="mx-auto max-w-2xl space-y-3 px-4 pb-32 pt-5 sm:px-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgb(15_23_42/0.04)] animate-pulse">
-              <div className="w-1 shrink-0 bg-slate-200" />
-              <div className="flex-1 px-5 py-4">
-                <div className="mb-3 h-4 w-2/3 rounded bg-slate-200" />
-                <div className="mb-3 h-3 w-1/3 rounded bg-slate-100" />
-                <div className="h-2 w-full rounded-full bg-slate-100" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen">
@@ -715,7 +691,20 @@ export default function Home() {
         )}
 
         {/* Items list */}
-        {displayItems.length === 0 ? (
+        {loading ? (
+          <ul aria-label="A carregar inventário" className="space-y-3" aria-busy="true">
+            {[1, 2, 3, 4].map((placeholder) => (
+              <li key={placeholder} className="flex overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgb(15_23_42/0.04)] animate-pulse">
+                <div className="w-1 shrink-0 bg-slate-200" />
+                <div className="flex-1 px-5 py-4">
+                  <div className="mb-3 h-4 w-2/3 rounded bg-slate-200" />
+                  <div className="mb-3 h-3 w-1/3 rounded bg-slate-100" />
+                  <div className="h-2 w-full rounded-full bg-slate-100" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : displayItems.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">
               {activeTab === "compras" ? "✅" : "📦"}
