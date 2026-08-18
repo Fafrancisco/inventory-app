@@ -397,14 +397,14 @@ test.describe("Configurações page", () => {
 
     await page.goto("/configuracoes");
 
-    const productsSection = page.locator("section").filter({ hasText: "Produtos" }).first();
+    const productsSection = page.locator("section").filter({ has: page.getByRole("heading", { name: "Produtos", exact: true }) }).first();
     await productsSection.locator("li").filter({ hasText: "Arroz" }).getByRole("button", { name: "Editar" }).click();
     await expect(productsSection.locator('input[value="Arroz"]')).toBeVisible();
     await productsSection.locator('input[value="Arroz"]').fill("Arroz Integral");
     await productsSection.getByRole("button", { name: "Guardar" }).first().click();
     await expect(page.getByText("Arroz Integral")).toBeVisible();
 
-    const locationsSection = page.locator("section").filter({ hasText: "Localizações" }).first();
+    const locationsSection = page.locator("section").filter({ has: page.getByRole("heading", { name: "Localizações", exact: true }) }).first();
     await locationsSection.locator("li").filter({ hasText: "📍 Cozinha" }).getByRole("button", { name: "Editar" }).click();
     await expect(locationsSection.locator('input[value="Cozinha"]')).toBeVisible();
     await locationsSection.locator('input[value="Cozinha"]').fill("Cozinha Principal");

@@ -69,6 +69,7 @@ export async function POST(request: Request) {
     if (action === "seed-inventory") {
       const result = await sql.begin(async (transaction) => {
         let productsInserted = 0;
+        const productsAdded: string[] = [];
         for (const [nome, unidade] of SAMPLE_PRODUCTS) {
           const productRows = await transaction`
             INSERT INTO products (nome, unidade)
@@ -77,9 +78,13 @@ export async function POST(request: Request) {
             RETURNING id
           `;
           productsInserted += productRows.length;
+          if (productRows.length > 0) productsAdded.push(nome);
         }
 
         let inventoryInserted = 0;
+        let inventoryUpdated = 0;
+        const inventoryAdded: string[] = [];
+        const inventoryUpdatedNames: string[] = [];
         for (const [nome, quantidade, stockMinimo, localizacao, unidade] of STOCK_FILL) {
           const existingRows = await transaction`
             UPDATE stock_items
@@ -96,6 +101,10 @@ export async function POST(request: Request) {
               RETURNING id
             `;
             inventoryInserted += stockRows.length;
+            if (stockRows.length > 0) inventoryAdded.push(nome);
+          } else {
+            inventoryUpdated += existingRows.length;
+            inventoryUpdatedNames.push(nome);
           }
         }
 
@@ -107,8 +116,12 @@ export async function POST(request: Request) {
 
         return {
           inserted: inventoryInserted,
+          updated: inventoryUpdated,
           productsInserted,
-          alreadySeeded: inventoryInserted === 0 && productsInserted === 0,
+          productsAdded,
+          inventoryAdded,
+          inventoryUpdatedNames,
+          alreadySeeded: inventoryInserted === 0 && inventoryUpdated === 0 && productsInserted === 0,
         };
       });
 

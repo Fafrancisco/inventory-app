@@ -18,6 +18,7 @@ interface Location {
 }
 
 type ConfigSection = "products" | "locations";
+type DatabaseLogEntry = { timestamp: string; message: string };
 
 const UNIDADES = ["un", "kg", "g", "L", "ml", "cx", "pac"];
 
@@ -33,6 +34,7 @@ export default function ConfiguracoesPage() {
   const [databaseBusy, setDatabaseBusy] = useState<"reset" | "seed" | null>(null);
   const [resetConfirmation, setResetConfirmation] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState<string | null>(null);
+  const [databaseLog, setDatabaseLog] = useState<DatabaseLogEntry[]>([]);
 
   const [newProduct, setNewProduct] = useState({ nome: "", unidade: "un", localizacao_padrao: "" });
   const [newLocation, setNewLocation] = useState("");
@@ -251,8 +253,20 @@ export default function ConfiguracoesPage() {
           ? "Quantidades limpas. Os artigos, produtos e localizações foram mantidos."
           : data.alreadySeeded
             ? "O inventário e os produtos de demonstração já estavam preenchidos."
-            : `Foram restaurados ${data.productsInserted} produto(s) e ${data.inserted} unidade(s) de stock.`
+            : `Foram restaurados ${data.productsInserted} produto(s), criadas ${data.inserted} unidade(s) e atualizados ${data.updated} artigo(s) de stock.`
       );
+      const addedProducts = Array.isArray(data.productsAdded) ? data.productsAdded : [];
+      const addedStock = Array.isArray(data.inventoryAdded) ? data.inventoryAdded : [];
+      const updatedStock = Array.isArray(data.inventoryUpdatedNames) ? data.inventoryUpdatedNames : [];
+      const details = [
+        addedProducts.length > 0 ? `Produtos criados: ${addedProducts.join(", ")}.` : "Nenhum produto novo.",
+        addedStock.length > 0 ? `Artigos de stock criados: ${addedStock.join(", ")}.` : "Nenhum artigo de stock novo.",
+        updatedStock.length > 0 ? `Quantidades repostas: ${updatedStock.join(", ")}.` : "Nenhuma quantidade existente foi alterada.",
+      ];
+      setDatabaseLog((previous) => [
+        { timestamp: new Date().toLocaleTimeString("pt-PT"), message: `${action === "reset" ? "Quantidades limpas" : "Inventário preenchido"}. ${details.join(" ")}` },
+        ...previous,
+      ].slice(0, 20));
       setResetConfirmation("");
       await Promise.all([fetchProducts(), fetchLocations()]);
     } catch (err) {
@@ -288,6 +302,55 @@ export default function ConfiguracoesPage() {
             <button onClick={() => setError(null)} className="font-bold shrink-0 text-red-400 hover:text-red-600">✕</button>
           </div>
         )}
+
+        <section className="mb-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+          <div className="border-b border-amber-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-amber-700" aria-hidden="true" />
+              <h2 className="font-semibold text-amber-950">Ferramentas de desenvolvimento</h2>
+            </div>
+            <p className="mt-1 text-xs text-amber-800">Preenche unidades de stock ou limpa apenas as quantidades.</p>
+          </div>
+
+          <div className="grid gap-4 p-4 md:grid-cols-2">
+            <div className="rounded-xl border border-amber-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                <PackagePlus className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Preencher inventário</h3>
+                  <p className="mt-1 text-xs text-slate-500">Repõe produtos comuns e cria uma unidade de stock para cada produto.</p>
+                </div>
+              </div>
+              <Button type="button" onClick={() => void handleDatabaseAction("seed-inventory")} disabled={databaseBusy !== null} className="mt-3 w-full bg-amber-700 text-white hover:bg-amber-800">
+                <PackagePlus className="h-4 w-4" aria-hidden="true" />
+                {databaseBusy === "seed" ? "A preencher..." : "Preencher inventário"}
+              </Button>
+            </div>
+
+            <div className="rounded-xl border border-red-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+                <div>
+                  <h3 className="text-sm font-semibold text-red-900">Limpar quantidades</h3>
+                  <p className="mt-1 text-xs text-slate-500">Coloca todas as quantidades a zero e mantém os artigos, produtos, receitas e localizações.</p>
+                </div>
+              </div>
+              <label className="mt-3 block text-xs font-semibold text-red-800" htmlFor="reset-confirmation">Escreve LIMPAR para confirmar</label>
+              <input id="reset-confirmation" value={resetConfirmation} onChange={(event) => setResetConfirmation(event.target.value.toUpperCase())} placeholder="LIMPAR" className="mt-1 w-full rounded-xl border border-red-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
+              <Button type="button" onClick={() => void handleDatabaseAction("reset")} disabled={databaseBusy !== null || resetConfirmation !== "LIMPAR"} className="mt-3 w-full bg-red-700 text-white hover:bg-red-800 disabled:bg-red-300">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {databaseBusy === "reset" ? "A limpar..." : "Limpar quantidades"}
+              </Button>
+            </div>
+          </div>
+          <div className="border-t border-amber-200 bg-[#12212b] px-4 py-3 text-xs text-slate-200" aria-live="polite">
+            <p className="mb-2 font-bold uppercase tracking-[0.16em] text-[#c7f36b]">Log de operações</p>
+            <div className="max-h-36 space-y-1 overflow-y-auto font-mono">
+              {databaseLog.length === 0 ? <p className="text-slate-400">Ainda não foram executadas operações.</p> : databaseLog.map((entry, index) => <p key={`${entry.timestamp}-${index}`}><span className="text-slate-400">[{entry.timestamp}]</span> {entry.message}</p>)}
+            </div>
+          </div>
+          {databaseMessage && <p className="border-t border-amber-200 px-4 py-3 text-sm font-medium text-emerald-700">{databaseMessage} <Link href="/inventario" className="font-bold text-[#405a1d] underline underline-offset-2">Ver inventário</Link></p>}
+        </section>
 
         <div className="md:hidden bg-white border border-slate-100 rounded-2xl p-1 mb-5 shadow-sm flex gap-1">
           <button
@@ -581,66 +644,6 @@ export default function ConfiguracoesPage() {
         </section>
         </div>
 
-        <section className="mt-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
-          <div className="border-b border-amber-200 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-amber-700" aria-hidden="true" />
-              <h2 className="font-semibold text-amber-950">Ferramentas de desenvolvimento</h2>
-            </div>
-            <p className="mt-1 text-xs text-amber-800">Ações diretas sobre os dados locais da aplicação.</p>
-          </div>
-
-          <div className="grid gap-4 p-4 md:grid-cols-2">
-            <div className="rounded-xl border border-amber-200 bg-white p-3">
-              <div className="flex items-start gap-3">
-                <PackagePlus className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-800">Preencher inventário</h3>
-                  <p className="mt-1 text-xs text-slate-500">Repõe produtos comuns e cria uma unidade de stock para cada produto.</p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                onClick={() => void handleDatabaseAction("seed-inventory")}
-                disabled={databaseBusy !== null}
-                className="mt-3 w-full bg-amber-700 text-white hover:bg-amber-800"
-              >
-                <PackagePlus className="h-4 w-4" aria-hidden="true" />
-                {databaseBusy === "seed" ? "A preencher..." : "Preencher inventário"}
-              </Button>
-            </div>
-
-            <div className="rounded-xl border border-red-200 bg-white p-3">
-              <div className="flex items-start gap-3">
-                <Trash2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
-                <div>
-                  <h3 className="text-sm font-semibold text-red-900">Limpar quantidades</h3>
-                  <p className="mt-1 text-xs text-slate-500">Coloca todas as quantidades a zero e mantém os artigos, produtos, receitas e localizações.</p>
-                </div>
-              </div>
-              <label className="mt-3 block text-xs font-semibold text-red-800" htmlFor="reset-confirmation">
-                Escreve LIMPAR para confirmar
-              </label>
-              <input
-                id="reset-confirmation"
-                value={resetConfirmation}
-                onChange={(event) => setResetConfirmation(event.target.value.toUpperCase())}
-                placeholder="LIMPAR"
-                className="mt-1 w-full rounded-xl border border-red-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
-              <Button
-                type="button"
-                onClick={() => void handleDatabaseAction("reset")}
-                disabled={databaseBusy !== null || resetConfirmation !== "LIMPAR"}
-                className="mt-3 w-full bg-red-700 text-white hover:bg-red-800 disabled:bg-red-300"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {databaseBusy === "reset" ? "A limpar..." : "Limpar quantidades"}
-              </Button>
-            </div>
-          </div>
-          {databaseMessage && <p className="border-t border-amber-200 px-4 py-3 text-sm font-medium text-emerald-700">{databaseMessage}</p>}
-        </section>
       </div>
     </div>
   );
