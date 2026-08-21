@@ -8,6 +8,8 @@ type RecipePreferenceRow = {
   allergens: string;
   max_time_minutes: number | null;
   notes: string;
+  default_servings: number;
+  planned_meals: number;
   auto_suggest_enabled: boolean;
   auto_suggest_cooldown_minutes: number;
   updated_at: string;
@@ -197,7 +199,7 @@ function buildInventorySignature(items: StockRow[]): string {
     .join("||");
 }
 
-function normalizeGeneratedRecipe(raw: unknown): GeneratedRecipe {
+function normalizeGeneratedRecipe(raw: unknown, requestedServings = 2): GeneratedRecipe {
   const fallback: GeneratedRecipe = {
     title: "Receita sugerida",
     summary: "",
@@ -232,12 +234,18 @@ function normalizeGeneratedRecipe(raw: unknown): GeneratedRecipe {
   return {
     title: normalizeText(parsed.title, fallback.title),
     summary: normalizeText(parsed.summary, ""),
-    servings: normalizeInt(parsed.servings),
+    servings: normalizeInt(parsed.servings) ?? requestedServings,
     prepMinutes: normalizeInt(parsed.prepMinutes),
     cookMinutes: normalizeInt(parsed.cookMinutes),
     instructions,
     ingredients,
   };
+}
+
+function normalizeGeneratedRecipes(raw: unknown, requestedServings: number, mealCount: number): GeneratedRecipe[] {
+  const parsed = parseJsonObject<Record<string, unknown>>(raw, {});
+  const rawRecipes = Array.isArray(parsed.recipes) ? parsed.recipes : [raw];
+  return rawRecipes.slice(0, mealCount).map((recipe) => normalizeGeneratedRecipe(recipe, requestedServings));
 }
 
 function parseModelJson(text: string): unknown {
@@ -258,7 +266,9 @@ function parseModelJson(text: string): unknown {
 function buildGeminiPrompt(
   inventory: StockRow[],
   preferences: RecipePreferenceRow,
-  contextRecipes: ContextRecipeRow[]
+  contextRecipes: ContextRecipeRow[],
+  requestedServings = preferences.default_servings,
+  mealCount = preferences.planned_meals
 ): string {
   const inventoryLines = inventory
     .map((item) => `${item.nome}: ${item.quantidade} ${item.unidade}${item.localizacao ? ` (${item.localizacao})` : ""}`)
@@ -309,6 +319,8 @@ function buildGeminiPrompt(
     `- alergias/intolerancias: ${preferences.allergens || "nenhuma indicada"}`,
     `- tempo maximo: ${preferences.max_time_minutes ?? "sem limite"} minutos`,
     `- notas livres: ${preferences.notes || "nenhuma"}`,
+    `- porções por refeição: ${requestedServings}`,
+    `- refeições a planear: ${mealCount}`,
     "Trata esta secção de preferências como instruções de maior prioridade.",
     "",
     "Receitas anteriores para evitar repeticoes:",
@@ -317,7 +329,9 @@ function buildGeminiPrompt(
     "Marca available=true apenas quando o ingrediente existe claramente no inventario acima; caso contrario available=false.",
     "Se faltar ingrediente, usa notes para indicar uma alternativa opcional quando fizer sentido.",
     "Formato JSON esperado:",
-    '{"title":"string","summary":"string","servings":number|null,"prepMinutes":number|null,"cookMinutes":number|null,"instructions":["passo 1"],"ingredients":[{"nome":"string","quantidade":"string","unidade":"string","available":true,"notes":"string"}]}'
+    mealCount === 1
+      ? '{"title":"string","summary":"string","servings":number,"prepMinutes":number|null,"cookMinutes":number|null,"instructions":["passo 1"],"ingredients":[{"nome":"string","quantidade":"string","unidade":"string","available":true,"notes":"string"}]}'
+      : '{"recipes":[{"title":"string","summary":"string","servings":number,"prepMinutes":number|null,"cookMinutes":number|null,"instructions":["passo 1"],"ingredients":[{"nome":"string","quantidade":"string","unidade":"string","available":true,"notes":"string"}]}]}'
   ].join("\n");
 }
 
@@ -412,7 +426,7 @@ function parseRecipeImage(value: unknown): RecipeImage | null {
   return { mimeType: mimeType as RecipeImage["mimeType"], data };
 }
 
-async function callGemini(prompt: string, image: RecipeImage | null): Promise<GeneratedRecipe> {
+async function callGemini(prompt: string, image: RecipeImage | null, requestedServings: number, mealCount: number): Promise<GeneratedRecipe[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY não configurada");
@@ -494,7 +508,7 @@ async function callGemini(prompt: string, image: RecipeImage | null): Promise<Ge
       continue;
     }
 
-    return normalizeGeneratedRecipe(raw);
+    return normalizeGeneratedRecipes(raw, requestedServings, mealCount);
   }
 
   if (lastError) {
@@ -506,7 +520,7 @@ async function callGemini(prompt: string, image: RecipeImage | null): Promise<Ge
 
 async function getPreferences(): Promise<RecipePreferenceRow> {
   const rows = await sql<RecipePreferenceRow[]>`
-    SELECT cuisine, diet, allergens, max_time_minutes, notes, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at
+    SELECT cuisine, diet, allergens, max_time_minutes, notes, default_servings, planned_meals, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at
     FROM recipe_preferences
     WHERE id = 1
     LIMIT 1
@@ -522,6 +536,8 @@ async function getPreferences(): Promise<RecipePreferenceRow> {
     allergens: "",
     max_time_minutes: null,
     notes: "",
+    default_servings: 2,
+    planned_meals: 1,
     auto_suggest_enabled: true,
     auto_suggest_cooldown_minutes: 180,
     updated_at: new Date().toISOString(),
@@ -594,6 +610,8 @@ export async function PUT(request: Request) {
     const diet = normalizeText(body.diet, "");
     const allergens = normalizeText(body.allergens, "");
     const notes = normalizeText(body.notes, "");
+    const defaultServings = Math.min(12, Math.max(1, Math.round(Number(body.defaultServings ?? 2) || 2)));
+    const plannedMeals = Math.min(3, Math.max(1, Math.round(Number(body.plannedMeals ?? 1) || 1)));
     const autoSuggestEnabled = typeof body.autoSuggestEnabled === "boolean" ? body.autoSuggestEnabled : true;
 
     const maxTimeMinutes =
@@ -608,8 +626,8 @@ export async function PUT(request: Request) {
     const autoSuggestCooldownMinutes = Math.max(5, cooldownRaw);
 
     const rows = await sql<RecipePreferenceRow[]>`
-      INSERT INTO recipe_preferences (id, cuisine, diet, allergens, max_time_minutes, notes, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at)
-      VALUES (1, ${cuisine}, ${diet}, ${allergens}, ${maxTimeMinutes}, ${notes}, ${autoSuggestEnabled}, ${autoSuggestCooldownMinutes}, NOW())
+      INSERT INTO recipe_preferences (id, cuisine, diet, allergens, max_time_minutes, notes, default_servings, planned_meals, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at)
+      VALUES (1, ${cuisine}, ${diet}, ${allergens}, ${maxTimeMinutes}, ${notes}, ${defaultServings}, ${plannedMeals}, ${autoSuggestEnabled}, ${autoSuggestCooldownMinutes}, NOW())
       ON CONFLICT (id)
       DO UPDATE SET
         cuisine = EXCLUDED.cuisine,
@@ -617,10 +635,12 @@ export async function PUT(request: Request) {
         allergens = EXCLUDED.allergens,
         max_time_minutes = EXCLUDED.max_time_minutes,
         notes = EXCLUDED.notes,
+        default_servings = EXCLUDED.default_servings,
+        planned_meals = EXCLUDED.planned_meals,
         auto_suggest_enabled = EXCLUDED.auto_suggest_enabled,
         auto_suggest_cooldown_minutes = EXCLUDED.auto_suggest_cooldown_minutes,
         updated_at = NOW()
-      RETURNING cuisine, diet, allergens, max_time_minutes, notes, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at
+      RETURNING cuisine, diet, allergens, max_time_minutes, notes, default_servings, planned_meals, auto_suggest_enabled, auto_suggest_cooldown_minutes, updated_at
     `;
 
     return NextResponse.json(rows[0]);
@@ -695,14 +715,43 @@ export async function POST(request: Request) {
       }
     }
 
-    const prompt = buildGeminiPrompt(edibleInventory, preferences, contextRecipes);
-    const generated = await callGemini(prompt, image);
-    const enriched = enrichWithAvailability(generated, edibleInventory);
+    const preferenceServings = preferences.default_servings ?? 2;
+    const preferenceMealCount = preferences.planned_meals ?? 1;
+    const requestedServings = Math.min(12, Math.max(1, Math.round(Number(body.servings ?? preferenceServings) || preferenceServings)));
+    const mealCount = Math.min(3, Math.max(1, Math.round(Number(body.mealCount ?? preferenceMealCount) || preferenceMealCount)));
+    const prompt = buildGeminiPrompt(edibleInventory, preferences, contextRecipes, requestedServings, mealCount);
+    const generatedRecipes = await callGemini(prompt, image, requestedServings, mealCount);
+    if (generatedRecipes.length === 0) {
+      throw new Error("Gemini não devolveu refeições válidas");
+    }
+    while (generatedRecipes.length < mealCount) {
+      const missingMealPrompt = buildGeminiPrompt(edibleInventory, preferences, contextRecipes, requestedServings, 1);
+      const additionalRecipes = await callGemini(missingMealPrompt, image, requestedServings, 1);
+      if (additionalRecipes.length === 0) break;
+      generatedRecipes.push(additionalRecipes[0]);
+    }
     const contextIds = contextRecipes.map((recipe: ContextRecipeRow) => recipe.id);
+    const persistedRecipes: Array<{
+      id: number;
+      title: string;
+      summary: string;
+      servings: number | null;
+      prep_minutes: number | null;
+      cook_minutes: number | null;
+      ingredients_json: unknown;
+      instructions_json: unknown;
+      generation_mode: string;
+      is_favorite: boolean;
+      generated_image_data: string | null;
+      created_at: string;
+      missingIngredients: MissingIngredient[];
+    }> = [];
 
-    const inserted = await sql<
-      { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; is_favorite: boolean; generated_image_data: string | null; created_at: string }[]
-    >`
+    for (const generated of generatedRecipes) {
+      const enriched = enrichWithAvailability(generated, edibleInventory);
+      const inserted = await sql<
+        { id: number; title: string; summary: string; servings: number | null; prep_minutes: number | null; cook_minutes: number | null; ingredients_json: unknown; instructions_json: unknown; generation_mode: string; is_favorite: boolean; generated_image_data: string | null; created_at: string }[]
+      >`
       INSERT INTO recipes (
         title,
         summary,
@@ -732,35 +781,42 @@ export async function POST(request: Request) {
         ${null}
       )
       RETURNING id, title, summary, servings, prep_minutes, cook_minutes, ingredients_json, instructions_json, generation_mode, is_favorite, generated_image_data, created_at
-    `;
-
-    const recipe = inserted[0];
-
-    for (const ingredient of enriched.ingredients) {
-      await sql`
-        INSERT INTO recipe_ingredients (recipe_id, nome, quantidade, unidade, available, notes)
-        VALUES (${recipe.id}, ${ingredient.nome}, ${ingredient.quantidade}, ${ingredient.unidade}, ${ingredient.available}, ${ingredient.notes})
       `;
+
+      const recipe = inserted[0];
+
+      for (const ingredient of enriched.ingredients) {
+        await sql`
+          INSERT INTO recipe_ingredients (recipe_id, nome, quantidade, unidade, available, notes)
+          VALUES (${recipe.id}, ${ingredient.nome}, ${ingredient.quantidade}, ${ingredient.unidade}, ${ingredient.available}, ${ingredient.notes})
+        `;
+      }
+
+      persistedRecipes.push({ ...recipe, missingIngredients: enriched.missingIngredients });
     }
+
+    const toResponseRecipe = (recipe: typeof persistedRecipes[number]) => ({
+      id: recipe.id,
+      title: recipe.title,
+      summary: recipe.summary,
+      servings: recipe.servings,
+      prepMinutes: recipe.prep_minutes,
+      cookMinutes: recipe.cook_minutes,
+      ingredients: parseJsonArray(recipe.ingredients_json),
+      missingIngredients: recipe.missingIngredients,
+      instructions: parseJsonArray(recipe.instructions_json),
+      generationMode: recipe.generation_mode,
+      isFavorite: recipe.is_favorite,
+      generatedImage: recipe.generated_image_data,
+      createdAt: recipe.created_at,
+    });
 
     return NextResponse.json(
       {
         generated: true,
-        recipe: {
-          id: recipe.id,
-          title: recipe.title,
-          summary: recipe.summary,
-          servings: recipe.servings,
-          prepMinutes: recipe.prep_minutes,
-          cookMinutes: recipe.cook_minutes,
-          ingredients: parseJsonArray(recipe.ingredients_json),
-          missingIngredients: enriched.missingIngredients,
-          instructions: parseJsonArray(recipe.instructions_json),
-          generationMode: recipe.generation_mode,
-          isFavorite: recipe.is_favorite,
-          generatedImage: recipe.generated_image_data,
-          createdAt: recipe.created_at,
-        },
+        recipe: toResponseRecipe(persistedRecipes[0]),
+        recipes: persistedRecipes.map(toResponseRecipe),
+        mealCount: persistedRecipes.length,
       },
       { status: 201 }
     );

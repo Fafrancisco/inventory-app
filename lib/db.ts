@@ -94,10 +94,22 @@ async function initSchema(): Promise<void> {
       allergens                     TEXT NOT NULL DEFAULT '',
       max_time_minutes              INTEGER CHECK (max_time_minutes >= 0),
       notes                         TEXT NOT NULL DEFAULT '',
+      default_servings              INTEGER NOT NULL DEFAULT 2 CHECK (default_servings BETWEEN 1 AND 12),
+      planned_meals                 INTEGER NOT NULL DEFAULT 1 CHECK (planned_meals BETWEEN 1 AND 3),
       auto_suggest_enabled          BOOLEAN NOT NULL DEFAULT TRUE,
       auto_suggest_cooldown_minutes INTEGER NOT NULL DEFAULT 180 CHECK (auto_suggest_cooldown_minutes >= 5),
       updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+
+  await sql`
+    ALTER TABLE recipe_preferences
+    ADD COLUMN IF NOT EXISTS default_servings INTEGER NOT NULL DEFAULT 2 CHECK (default_servings BETWEEN 1 AND 12)
+  `;
+
+  await sql`
+    ALTER TABLE recipe_preferences
+    ADD COLUMN IF NOT EXISTS planned_meals INTEGER NOT NULL DEFAULT 1 CHECK (planned_meals BETWEEN 1 AND 3)
   `;
 
   await sql`

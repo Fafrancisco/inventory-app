@@ -26,6 +26,8 @@ async function mockApi(
             allergens: "",
             max_time_minutes: null,
             notes: "",
+            default_servings: 2,
+            planned_meals: 1,
             auto_suggest_enabled: true,
             auto_suggest_cooldown_minutes: 180,
           },
@@ -410,6 +412,66 @@ test.describe("Configurações page", () => {
     await locationsSection.locator('input[value="Cozinha"]').fill("Cozinha Principal");
     await locationsSection.getByRole("button", { name: "Guardar" }).first().click();
     await expect(page.getByText("📍 Cozinha Principal")).toBeVisible();
+  });
+});
+
+test.describe("Chef AI page", () => {
+  test("generates recipe images only when requested", async ({ page }) => {
+    let imageRequests = 0;
+    const recipe = {
+      id: 42,
+      title: "Sopa de legumes",
+      summary: "Uma sopa simples.",
+      servings: 2,
+      prepMinutes: 10,
+      cookMinutes: 25,
+      ingredients: [],
+      missingIngredients: [],
+      instructions: ["Cozer os legumes."],
+      generationMode: "manual",
+      isFavorite: false,
+      generatedImage: null,
+      createdAt: "2026-08-21T10:00:00.000Z",
+    };
+
+    await page.route("**/api/recipes", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          json: {
+            preferences: {
+              cuisine: "",
+              diet: "",
+              allergens: "",
+              max_time_minutes: null,
+              notes: "",
+              default_servings: 2,
+              planned_meals: 1,
+              auto_suggest_enabled: true,
+              auto_suggest_cooldown_minutes: 180,
+            },
+            recipes: [recipe],
+          },
+        });
+        return;
+      }
+      await route.fulfill({ status: 500, json: { error: "Unexpected recipe mutation" } });
+    });
+
+    await page.route("**/api/recipes/42/image", async (route) => {
+      imageRequests += 1;
+      await route.fulfill({
+        json: { generated: true, generatedImage: "data:image/png;base64,aW1hZ2U=" },
+      });
+    });
+
+    await page.goto("/receitas");
+    await expect(page.getByRole("button", { name: "Gerar imagem" })).toBeVisible();
+    expect(imageRequests).toBe(0);
+
+    await page.getByRole("button", { name: "Gerar imagem" }).click();
+    await expect(page.getByRole("img", { name: "Imagem sugerida para Sopa de legumes" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Gerar imagem" })).not.toBeVisible();
+    expect(imageRequests).toBe(1);
   });
 });
 

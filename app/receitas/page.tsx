@@ -38,6 +38,8 @@ type Preferences = {
   allergens: string;
   max_time_minutes: number | null;
   notes: string;
+  default_servings: number;
+  planned_meals: number;
   auto_suggest_enabled: boolean;
   auto_suggest_cooldown_minutes: number;
 };
@@ -54,6 +56,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   allergens: "",
   max_time_minutes: null,
   notes: "",
+  default_servings: 2,
+  planned_meals: 1,
   auto_suggest_enabled: true,
   auto_suggest_cooldown_minutes: 180,
 };
@@ -64,6 +68,7 @@ export default function ReceitasPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generatingImageForRecipeId, setGeneratingImageForRecipeId] = useState<number | null>(null);
   const [addingMissingForRecipeId, setAddingMissingForRecipeId] = useState<number | null>(null);
   const [updatingRecipeId, setUpdatingRecipeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +150,8 @@ export default function ReceitasPage() {
           allergens: preferences.allergens,
           maxTimeMinutes: preferences.max_time_minutes,
           notes: preferences.notes,
+          defaultServings: preferences.default_servings,
+          plannedMeals: preferences.planned_meals,
           autoSuggestEnabled: preferences.auto_suggest_enabled,
           autoSuggestCooldownMinutes: preferences.auto_suggest_cooldown_minutes,
         }),
@@ -161,16 +168,23 @@ export default function ReceitasPage() {
   };
 
   const generateRecipeImage = async (recipeId: number) => {
+    setGeneratingImageForRecipeId(recipeId);
+    setError(null);
+    setInfo(null);
     try {
       const res = await fetch(`/api/recipes/${recipeId}/image`, { method: "POST" });
-      if (!res.ok) return;
       const data = await res.json();
-      if (!data.generatedImage) return;
+      if (!res.ok || !data.generatedImage) {
+        throw new Error(data?.error ?? "Não foi possível gerar a imagem.");
+      }
       setRecipes((prev) => prev.map((recipe) => (
         recipe.id === recipeId ? { ...recipe, generatedImage: data.generatedImage } : recipe
       )));
-    } catch {
-      // The recipe remains usable when optional image generation fails.
+      setInfo("Imagem da receita gerada com sucesso.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível gerar a imagem.");
+    } finally {
+      setGeneratingImageForRecipeId(null);
     }
   };
 
@@ -184,6 +198,8 @@ export default function ReceitasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "manual",
+            servings: preferences.default_servings,
+            mealCount: preferences.planned_meals,
           image: referenceImage
             ? {
                 mimeType: referenceImage.mimeType,
@@ -203,15 +219,14 @@ export default function ReceitasPage() {
         throw new Error(data?.error ?? "Erro ao gerar receita");
       }
 
-      setRecipes((prev) => [data.recipe, ...prev]);
-  void generateRecipeImage(data.recipe.id);
-      const missingCount = Array.isArray(data?.recipe?.missingIngredients)
-        ? data.recipe.missingIngredients.length
-        : 0;
+      const generatedRecipes: Recipe[] = Array.isArray(data.recipes) && data.recipes.length > 0 ? data.recipes : [data.recipe];
+      setRecipes((prev) => [...generatedRecipes, ...prev]);
+      const missingCount = generatedRecipes.reduce((total, recipe) => total + (Array.isArray(recipe?.missingIngredients) ? recipe.missingIngredients.length : 0), 0);
+      const mealLabel = generatedRecipes.length === 1 ? "Nova receita gerada" : `Plano com ${generatedRecipes.length} refeições gerado`;
       setInfo(
         missingCount > 0
-          ? `Nova receita gerada. Faltam ${missingCount} ingrediente(s); podes adicioná-los à lista de compras.`
-          : "Nova receita gerada com sucesso."
+          ? `${mealLabel}. Faltam ${missingCount} ingrediente(s); podes adicioná-los à lista de compras.`
+          : `${mealLabel} com sucesso.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
@@ -472,6 +487,32 @@ export default function ReceitasPage() {
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50"
               />
             </div>
+            <div>
+              <label htmlFor="default-servings" className="text-xs font-medium text-slate-500 block mb-1">Porções por refeição</label>
+              <select
+                id="default-servings"
+                value={preferences.default_servings}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, default_servings: Number(e.target.value) }))}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50"
+              >
+                {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((servings) => (
+                  <option key={servings} value={servings}>{servings} {servings === 1 ? "porção" : "porções"}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="planned-meals" className="text-xs font-medium text-slate-500 block mb-1">Refeições a planear</label>
+              <select
+                id="planned-meals"
+                value={preferences.planned_meals}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, planned_meals: Number(e.target.value) }))}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50"
+              >
+                {[1, 2, 3].map((mealCount) => (
+                  <option key={mealCount} value={mealCount}>{mealCount} {mealCount === 1 ? "refeição" : "refeições"}</option>
+                ))}
+              </select>
+            </div>
             <div className="md:col-span-2">
               <label className="text-xs font-medium text-slate-500 block mb-1">Notas livres</label>
               <textarea
@@ -599,12 +640,23 @@ export default function ReceitasPage() {
                     </div>
                   </div>
 
-                  {recipe.generatedImage && (
+                  {recipe.generatedImage ? (
                     <img
                       src={recipe.generatedImage}
                       alt={`Imagem sugerida para ${recipe.title}`}
                       className="mt-3 aspect-[16/9] w-full rounded-xl object-cover"
                     />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void generateRecipeImage(recipe.id)}
+                      disabled={generatingImageForRecipeId !== null}
+                      className="mt-2 min-h-10 rounded-xl px-3 text-xs"
+                    >
+                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                      {generatingImageForRecipeId === recipe.id ? "A gerar imagem..." : "Gerar imagem"}
+                    </Button>
                   )}
 
                   <div className="flex flex-wrap gap-2 text-[11px] text-slate-500">

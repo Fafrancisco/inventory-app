@@ -64,6 +64,8 @@ describe("/api/recipes route", () => {
         allergens: "lactose",
         max_time_minutes: 25,
         notes: "evitar fritos",
+          default_servings: 4,
+          planned_meals: 2,
         auto_suggest_enabled: true,
         auto_suggest_cooldown_minutes: 120,
         updated_at: "2026-07-25T10:00:00.000Z",
@@ -80,6 +82,8 @@ describe("/api/recipes route", () => {
           allergens: "lactose",
           maxTimeMinutes: 25,
           notes: "evitar fritos",
+          defaultServings: 4,
+          plannedMeals: 2,
           autoSuggestEnabled: true,
           autoSuggestCooldownMinutes: 120,
         }),
@@ -89,6 +93,8 @@ describe("/api/recipes route", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.diet).toBe("vegetariana");
+    expect(body.default_servings).toBe(4);
+    expect(body.planned_meals).toBe(2);
   });
 
   it("POST generates and stores a recipe", async () => {
