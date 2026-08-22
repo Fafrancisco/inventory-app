@@ -11,14 +11,19 @@ const isLocalDb = /@(?:localhost|127\.0\.0\.1)(?::\d+)?\//i.test(dbUrl);
 // transaction-mode pooler URL. Prepared statements must be disabled
 // because PgBouncer transaction mode does not support them.
 //
-// max: 1 — each Vercel serverless function instance handles one request
-//   at a time, so a single connection per instance is optimal.
+// Keep a small pool because a Vercel function instance can serve overlapping
+// requests; max: 1 would let one stalled query block every other request.
 // idle_timeout: 20 — short timeout is appropriate for short-lived
 //   serverless invocations to release connections promptly.
 export const sql = postgres(dbUrl, {
-  max: 1,
+  max: 3,
   idle_timeout: 20,
   connect_timeout: 10,
+  connection: {
+    statement_timeout: 10_000,
+    lock_timeout: 5_000,
+    idle_in_transaction_session_timeout: 10_000,
+  },
   ssl: isLocalDb ? false : "require",
   prepare: false,
 });

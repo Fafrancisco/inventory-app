@@ -56,6 +56,22 @@ describe("/api/recipes route", () => {
     expect(body.recipes[0].title).toBe("Arroz salteado");
   });
 
+  it("GET fails fast when the database does not respond", async () => {
+    vi.useFakeTimers();
+    mockSql.mockImplementation(() => new Promise(() => {}));
+
+    try {
+      const responsePromise = GET(new Request("http://localhost/api/recipes"));
+      await vi.advanceTimersByTimeAsync(10_000);
+      const res = await responsePromise;
+
+      expect(res.status).toBe(504);
+      expect(await res.json()).toEqual({ error: "Tempo limite excedido ao carregar receitas" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("PUT saves preferences", async () => {
     mockSql.mockResolvedValueOnce([
       {

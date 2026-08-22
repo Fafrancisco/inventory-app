@@ -90,6 +90,27 @@ const GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-2.5-flash"];
 const CONTEXT_RECIPES_LIMIT = 5;
 const CONTEXT_RECIPE_SUMMARY_MAX_LEN = 220;
 const CONTEXT_RECIPE_INGREDIENTS_MAX = 10;
+const RECIPES_READ_TIMEOUT_MS = 10_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 15_000;
+
+export const maxDuration = 30;
+
+class RecipesApiTimeoutError extends Error {}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new RecipesApiTimeoutError(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 const NON_EDIBLE_CATEGORY_KEYWORDS = [
   "limpeza",
@@ -438,29 +459,44 @@ async function callGemini(prompt: string, image: RecipeImage | null, requestedSe
   for (const model of models) {
     const modelPath = normalizeModelNameForApi(model);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [
-              { text: prompt },
-              ...(image ? [{ inline_data: { mime_type: image.mimeType, data: image.data } }] : []),
-            ],
-          }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.4,
-            maxOutputTokens: 1600,
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        }),
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [
+                { text: prompt },
+                ...(image ? [{ inline_data: { mime_type: image.mimeType, data: image.data } }] : []),
+              ],
+            }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.4,
+              maxOutputTokens: 1600,
+            },
+          }),
+          signal: controller.signal,
+        }
+      );
+    } catch (error) {
+      if (controller.signal.aborted) {
+        lastError = new GeminiApiError(`Tempo limite excedido ao contactar o Gemini (${model}).`, 504);
+        continue;
       }
-    );
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -557,10 +593,14 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limitParam = Number(searchParams.get("limit") ?? "20");
-    const [preferences, recipes] = await Promise.all([
-      getPreferences(),
-      getRecipes(Number.isFinite(limitParam) ? limitParam : 20),
-    ]);
+    const [preferences, recipes] = await withTimeout(
+      Promise.all([
+        getPreferences(),
+        getRecipes(Number.isFinite(limitParam) ? limitParam : 20),
+      ]),
+      RECIPES_READ_TIMEOUT_MS,
+      "Tempo limite excedido ao carregar receitas"
+    );
 
     return NextResponse.json({
       preferences,
@@ -595,6 +635,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("GET /api/recipes failed:", error);
+    if (error instanceof RecipesApiTimeoutError) {
+      return NextResponse.json({ error: error.message }, { status: 504 });
+    }
     return NextResponse.json(
       { error: "Erro ao carregar receitas" },
       { status: 500 }

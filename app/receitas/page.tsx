@@ -62,6 +62,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   auto_suggest_cooldown_minutes: 180,
 };
 
+const RECIPE_LOAD_TIMEOUT_MS = 12_000;
+
 export default function ReceitasPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
@@ -90,15 +92,23 @@ export default function ReceitasPage() {
   };
 
   const fetchData = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RECIPE_LOAD_TIMEOUT_MS);
+
     try {
-      const res = await fetch("/api/recipes");
+      const res = await fetch("/api/recipes", { signal: controller.signal });
       if (!res.ok) throw new Error("Erro ao carregar receitas");
       const data = await res.json();
       setRecipes(Array.isArray(data.recipes) ? data.recipes : []);
       setPreferences(data.preferences ?? DEFAULT_PREFERENCES);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
+      if (controller.signal.aborted) {
+        setError("O carregamento das receitas demorou demasiado. Tenta novamente.");
+      } else {
+        setError(err instanceof Error ? err.message : "Erro desconhecido");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, []);
